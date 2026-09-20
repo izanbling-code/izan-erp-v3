@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 === app\sales\customers\page.tsx ===
 "use client";
 
@@ -439,6 +440,449 @@ export default function SalesCustomersPage() {
 }
 
 === app\sales\invoices\new\page.tsx ===
+=======
+=== app\sales\customers\page.tsx ===
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+
+type Customer = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  taxNumber: string | null;
+  openingBalance: string | number;
+  creditLimit: string | number;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+};
+
+type CustomerForm = {
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  taxNumber: string;
+  openingBalance: string;
+  creditLimit: string;
+};
+
+const emptyForm: CustomerForm = {
+  name: "",
+  phone: "",
+  email: "",
+  address: "",
+  city: "",
+  taxNumber: "",
+  openingBalance: "0",
+  creditLimit: "0",
+};
+
+function formatAmount(value: string | number) {
+  return Number(value || 0).toLocaleString("en-PK", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+export default function SalesCustomersPage() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState<CustomerForm>(emptyForm);
+
+  async function loadCustomers() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch("/api/customers");
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Failed to load customers");
+      }
+
+      setCustomers(data.customers);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load customers"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  const filteredCustomers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return customers;
+    }
+
+    return customers.filter((customer) =>
+      [
+        customer.name,
+        customer.email,
+        customer.phone,
+        customer.city,
+        customer.taxNumber,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    );
+  }, [customers, search]);
+
+  function updateField(
+    field: keyof CustomerForm,
+    value: string
+  ) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!form.name.trim()) {
+      setError("Customer name is required.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+
+      const response = await fetch("/api/customers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          email: form.email,
+          address: form.address,
+          city: form.city,
+          taxNumber: form.taxNumber,
+          openingBalance: Number(form.openingBalance || 0),
+          creditLimit: Number(form.creditLimit || 0),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Failed to create customer");
+      }
+
+      setForm(emptyForm);
+      setShowForm(false);
+
+      await loadCustomers();
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error ? err.message : "Failed to create customer"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="dashboard">
+      <div className="dashboard-heading">
+        <div>
+          <p className="eyebrow">Sales</p>
+          <h1>Customers</h1>
+          <p className="dashboard-description">
+            Manage customer records, balances and contact information.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="customer-primary-button"
+          onClick={() => {
+            setError("");
+            setForm(emptyForm);
+            setShowForm(true);
+          }}
+        >
+          + New Customer
+        </button>
+      </div>
+
+      {error && (
+        <div className="customer-error">
+          {error}
+        </div>
+      )}
+
+      {showForm && (
+        <section className="dashboard-panel customer-form-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>New customer</h2>
+              <p className="customer-form-subtitle">
+                Enter the customer's basic information.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="customer-secondary-button"
+              onClick={() => setShowForm(false)}
+            >
+              Cancel
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="customer-form-grid">
+              <label>
+                Customer name *
+                <input
+                  value={form.name}
+                  onChange={(event) =>
+                    updateField("name", event.target.value)
+                  }
+                  placeholder="e.g. Ahmed Khan"
+                  required
+                />
+              </label>
+
+              <label>
+                Phone
+                <input
+                  value={form.phone}
+                  onChange={(event) =>
+                    updateField("phone", event.target.value)
+                  }
+                  placeholder="03XX XXXXXXX"
+                />
+              </label>
+
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(event) =>
+                    updateField("email", event.target.value)
+                  }
+                  placeholder="customer@example.com"
+                />
+              </label>
+
+              <label>
+                City
+                <input
+                  value={form.city}
+                  onChange={(event) =>
+                    updateField("city", event.target.value)
+                  }
+                  placeholder="Islamabad"
+                />
+              </label>
+
+              <label>
+                Tax number
+                <input
+                  value={form.taxNumber}
+                  onChange={(event) =>
+                    updateField("taxNumber", event.target.value)
+                  }
+                  placeholder="Optional"
+                />
+              </label>
+
+              <label>
+                Credit limit
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.creditLimit}
+                  onChange={(event) =>
+                    updateField("creditLimit", event.target.value)
+                  }
+                />
+              </label>
+
+              <label>
+                Opening balance
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.openingBalance}
+                  onChange={(event) =>
+                    updateField(
+                      "openingBalance",
+                      event.target.value
+                    )
+                  }
+                />
+              </label>
+
+              <label className="customer-form-full">
+                Address
+                <textarea
+                  value={form.address}
+                  onChange={(event) =>
+                    updateField("address", event.target.value)
+                  }
+                  placeholder="Customer address"
+                  rows={3}
+                />
+              </label>
+            </div>
+
+            <div className="customer-form-actions">
+              <button
+                type="button"
+                className="customer-secondary-button"
+                onClick={() => setShowForm(false)}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="customer-primary-button"
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save Customer"}
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      <section className="dashboard-panel">
+        <div className="panel-heading customer-list-heading">
+          <div>
+            <h2>Customer list</h2>
+            <p className="customer-count">
+              {customers.length} customer
+              {customers.length === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          <input
+            className="customer-search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search customers..."
+          />
+        </div>
+
+        {loading ? (
+          <div className="customer-loading">
+            Loading customers...
+          </div>
+        ) : filteredCustomers.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">CUS</div>
+
+            <h3>
+              {customers.length === 0
+                ? "No customers yet"
+                : "No matching customers"}
+            </h3>
+
+            <p>
+              {customers.length === 0
+                ? "Create your first customer to start recording sales and payments."
+                : "Try a different name, phone number, email or city."}
+            </p>
+
+            {customers.length === 0 && (
+              <button
+                type="button"
+                className="customer-primary-button"
+                onClick={() => setShowForm(true)}
+              >
+                + Add first customer
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="customer-table-wrapper">
+            <table className="customer-table">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Phone</th>
+                  <th>City</th>
+                  <th>Opening balance</th>
+                  <th>Credit limit</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredCustomers.map((customer) => (
+                  <tr key={customer.id}>
+                    <td>
+                      <strong>{customer.name}</strong>
+
+                      {customer.email && (
+                        <small>{customer.email}</small>
+                      )}
+                    </td>
+
+                    <td>{customer.phone || "—"}</td>
+
+                    <td>{customer.city || "—"}</td>
+
+                    <td>
+                      PKR {formatAmount(customer.openingBalance)}
+                    </td>
+
+                    <td>
+                      PKR {formatAmount(customer.creditLimit)}
+                    </td>
+
+                    <td>
+                      <span
+                        className={`customer-status ${
+                          customer.status === "ACTIVE"
+                            ? "active"
+                            : "inactive"
+                        }`}
+                      >
+                        {customer.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+=== app\sales\invoices\new\page.tsx ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -2039,9 +2483,15 @@ export default function NewSalesInvoicePage() {
       </section>
     </div>
   );
+<<<<<<< HEAD
 }
 
 === app\sales\invoices\page.tsx ===
+=======
+}
+
+=== app\sales\invoices\page.tsx ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -3278,6 +3728,7 @@ export default function NewSalesInvoicePage() {
     </div>
   );
 }
+<<<<<<< HEAD
 
 
 
@@ -3416,6 +3867,146 @@ export default function SalesPage() {
 }
 
 === app\api\accounting\journals\route.ts ===
+=======
+
+
+
+=== app\sales\payments\page.tsx ===
+export default function SalesPaymentsPage() {
+  return (
+    <div className="dashboard">
+      <div className="dashboard-heading">
+        <div>
+          <p className="eyebrow">Sales / Payments</p>
+          <h1>Customer Payments</h1>
+          <p className="dashboard-description">
+            Record and manage payments received from customers.
+          </p>
+        </div>
+      </div>
+
+      <section className="dashboard-panel">
+        <div className="empty-state">
+          <div className="empty-state-icon">PAY</div>
+          <h3>Customer payments</h3>
+          <p>
+            Payment recording, allocation against invoices and accounting
+            entries will be implemented here.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+=== app\sales\page.tsx ===
+import Link from "next/link";
+
+const modules = [
+  {
+    title: "Invoices",
+    description: "Create, manage and review customer sales invoices.",
+    href: "/sales/invoices",
+    icon: "INV",
+  },
+  {
+    title: "Customers",
+    description: "Manage customers, balances and customer accounts.",
+    href: "/sales/customers",
+    icon: "CUS",
+  },
+  {
+    title: "Payments",
+    description: "Record and manage payments received from customers.",
+    href: "/sales/payments",
+    icon: "PAY",
+  },
+];
+
+export default function SalesPage() {
+  return (
+    <div className="sales-page">
+      <header className="sales-page-header">
+        <div>
+          <span className="sales-eyebrow">Transactions</span>
+          <h1>Sales</h1>
+          <p>Manage invoices, customers and customer payments.</p>
+        </div>
+
+        <Link href="/sales/invoices/new" className="sales-primary-button">
+          <span>+</span>
+          New Invoice
+        </Link>
+      </header>
+
+      <section className="sales-summary-grid">
+        <div className="sales-summary-card">
+          <div className="sales-summary-card-top">
+            <span>Sales invoices</span>
+            <span className="sales-summary-dot" />
+          </div>
+          <strong>0</strong>
+          <small>Total invoices</small>
+        </div>
+
+        <div className="sales-summary-card">
+          <div className="sales-summary-card-top">
+            <span>Receivables</span>
+            <span className="sales-summary-dot" />
+          </div>
+          <strong>₨ 0.00</strong>
+          <small>Outstanding</small>
+        </div>
+
+        <div className="sales-summary-card">
+          <div className="sales-summary-card-top">
+            <span>Customers</span>
+            <span className="sales-summary-dot" />
+          </div>
+          <strong>0</strong>
+          <small>Active customers</small>
+        </div>
+
+        <div className="sales-summary-card">
+          <div className="sales-summary-card-top">
+            <span>Payments</span>
+            <span className="sales-summary-dot" />
+          </div>
+          <strong>₨ 0.00</strong>
+          <small>Received</small>
+        </div>
+      </section>
+
+      <section className="sales-panel">
+        <div className="sales-panel-header">
+          <div>
+            <h2>Sales operations</h2>
+            <p>Access the main sales functions.</p>
+          </div>
+        </div>
+
+        <div className="sales-module-grid" style={{ padding: 18 }}>
+          {modules.map((module) => (
+            <Link
+              key={module.href}
+              href={module.href}
+              className="sales-module-card"
+            >
+              <div className="sales-module-icon">{module.icon}</div>
+
+              <h3>{module.title}</h3>
+
+              <p>{module.description}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+=== app\api\accounting\journals\route.ts ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
@@ -4187,12 +4778,21 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 }
 
 
 
 
 === app\api\accounting\opening-balances\route.ts ===
+=======
+}
+
+
+
+
+=== app\api\accounting\opening-balances\route.ts ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
@@ -4597,10 +5197,17 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 }
 
 
 === app\api\accounts\route.ts ===
+=======
+}
+
+
+=== app\api\accounts\route.ts ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
@@ -5161,6 +5768,7 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 }
 
 
@@ -5300,6 +5908,147 @@ export async function GET() {
 }
 
 === app\api\inventory-movements\route.ts ===
+=======
+}
+
+
+
+
+
+=== app\api\customers\route.ts ===
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+export async function GET() {
+  try {
+    const customers = await prisma.customer.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      customers,
+    });
+  } catch (error) {
+    console.error("GET /api/customers error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load customers",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    const name = String(body.name ?? "").trim();
+
+    if (!name) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Customer name is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * Temporary single-company setup.
+     *
+     * We will replace this with the authenticated/company context
+     * once user/company authentication is implemented.
+     */
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const customer = await prisma.customer.create({
+      data: {
+        companyId: company.id,
+        name,
+        email: body.email ? String(body.email).trim() : null,
+        phone: body.phone ? String(body.phone).trim() : null,
+        address: body.address ? String(body.address).trim() : null,
+        city: body.city ? String(body.city).trim() : null,
+        taxNumber: body.taxNumber
+          ? String(body.taxNumber).trim()
+          : null,
+        openingBalance: body.openingBalance ?? 0,
+        creditLimit: body.creditLimit ?? 0,
+        status: body.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+      },
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        customer,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("POST /api/customers error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to create customer",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+=== app\api\health\route.ts ===
+import { prisma } from "@/app/lib/prisma";
+
+export async function GET() {
+  try {
+    const result = await prisma.$queryRaw<
+      { now: Date }[]
+    >`SELECT NOW() AS now`;
+
+    return Response.json({
+      ok: true,
+      database: "connected",
+      timestamp: result[0]?.now ?? null,
+    });
+  } catch (error) {
+    console.error("Database health check failed:", error);
+
+    return Response.json(
+      {
+        ok: false,
+        database: "error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+=== app\api\inventory-movements\route.ts ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
@@ -5551,8 +6300,13 @@ export async function POST(request: NextRequest) {
 
     const movementType: MovementType = movementTypeValue;
 
+<<<<<<< HEAD
     if (!parsedProductId) { return NextResponse.json({ ok: false, error: "Product is required" }, { status: 400 }); }
 
+=======
+    if (!parsedProductId) { return NextResponse.json({ ok: false, error: "Product is required" }, { status: 400 }); }
+
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
     const productId: string = parsedProductId; 
 const batchId = cleanString(body.batchId);
 
@@ -6389,6 +7143,7 @@ const batchId = cleanString(body.batchId);
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 }
 
 
@@ -7646,14 +8401,1280 @@ export async function PUT(request: NextRequest) {
   }
 }
 
+=======
+}
+
+
+
+
+
+
+
+
+
+
+=== app\api\products\route.ts ===
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+function decimalNumber(value: unknown, fallback = 0) {
+  const number = Number(value ?? fallback);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return number;
+}
+
+export async function GET() {
+  try {
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const [
+      products,
+      categories,
+      brands,
+      units,
+      accounts,
+      warehouses,
+    ] = await Promise.all([
+      prisma.product.findMany({
+        where: {
+          companyId: company.id,
+        },
+        include: {
+          category: true,
+          brand: true,
+          unit: true,
+
+          inventoryAccount: true,
+          salesAccount: true,
+          cogsAccount: true,
+          purchaseAccount: true,
+
+          stock: {
+            select: {
+              quantity: true,
+              averageCost: true,
+            },
+          },
+
+          batches: {
+            orderBy: {
+              purchaseDate: "asc",
+            },
+            include: {
+              stockBatches: {
+                include: {
+                  warehouse: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+
+      prisma.category.findMany({
+        where: {
+          companyId: company.id,
+        },
+        orderBy: { name: "asc" },
+      }),
+
+      prisma.brand.findMany({
+        where: {
+          companyId: company.id,
+        },
+        orderBy: { name: "asc" },
+      }),
+
+      prisma.unit.findMany({
+        where: {
+          companyId: company.id,
+        },
+        orderBy: { name: "asc" },
+      }),
+
+      prisma.account.findMany({
+        where: {
+          companyId: company.id,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true, },
+        orderBy: {
+          code: "asc",
+        },
+      }),
+
+      prisma.warehouse.findMany({
+        where: {
+          companyId: company.id,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+        },
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+    const normalizedProducts = products.map((product) => ({
+      ...product,
+
+      batches: product.batches.map((batch) => ({
+        ...batch,
+        stock: batch.stockBatches,
+      })),
+    }));
+
+    return NextResponse.json({
+      ok: true,
+      products: normalizedProducts,
+      categories,
+      brands,
+      units,
+      accounts,
+      warehouses,
+    });
+  } catch (error) {
+    console.error("GET /api/products error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load products",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+async function createMasterData(req: Request, companyId: string) { const body=await req.json(); if(body.action==="CREATE_CATEGORY"){const x=await prisma.category.create({data:{companyId,name:body.name.trim()}});return Response.json({category:x},{status:201})} if(body.action==="CREATE_BRAND"){const x=await prisma.brand.create({data:{companyId,name:body.name.trim()}});return Response.json({brand:x},{status:201})} if(body.action==="CREATE_UNIT"){const x=await prisma.unit.create({data:{companyId,name:body.name.trim(),abbreviation:String(body.abbreviation??body.name??"").trim().slice(0,10).toUpperCase()}});return Response.json({unit:x},{status:201})} return null }
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    if (body.action === "OPENING_STOCK") {
+      return await createOpeningStock(body);
+    }
+
+    const name = String(body.name ?? "").trim();
+    const sku = String(body.sku ?? "").trim();
+
+    if (!name) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product name is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!sku) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "SKU is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const existingProduct =
+      await prisma.product.findFirst({
+        where: {
+          companyId: company.id,
+          sku,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (existingProduct) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `A product with SKU "${sku}" already exists.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        companyId: company.id,
+        name,
+        sku,
+
+        description: body.description
+          ? String(body.description).trim()
+          : null,
+
+        type:
+          body.type === "SERVICE"
+            ? "SERVICE"
+            : "PRODUCT",
+
+        categoryId: body.categoryId
+          ? String(body.categoryId)
+          : null,
+
+        brandId: body.brandId
+          ? String(body.brandId)
+          : null,
+
+        unitId: body.unitId
+          ? String(body.unitId)
+          : null,
+
+        costPrice: decimalNumber(body.costPrice),
+        salePrice: decimalNumber(body.salePrice),
+        reorderLevel: decimalNumber(
+          body.reorderLevel
+        ),
+
+        isActive: body.isActive !== false,
+
+        inventoryAccountId:
+          body.inventoryAccountId
+            ? String(body.inventoryAccountId)
+            : null,
+
+        salesAccountId: body.salesAccountId
+          ? String(body.salesAccountId)
+          : null,
+
+        cogsAccountId: body.cogsAccountId
+          ? String(body.cogsAccountId)
+          : null,
+
+        purchaseAccountId:
+          body.purchaseAccountId
+            ? String(body.purchaseAccountId)
+            : null,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        product,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("POST /api/products error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to create product",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+async function createOpeningStock(body: any) {
+  const productId = String(body.productId ?? "");
+  const warehouseId = String(
+    body.warehouseId ?? ""
+  );
+  const batchNumber = String(
+    body.batchNumber ?? ""
+  ).trim();
+
+  const quantity = decimalNumber(body.quantity);
+  const unitCost = decimalNumber(body.unitCost);
+
+  if (!productId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Product is required.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!warehouseId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Warehouse is required.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!batchNumber) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Batch number is required.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Quantity must be greater than zero.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!Number.isFinite(unitCost) || unitCost < 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Unit cost cannot be negative.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const company = await prisma.company.findFirst({
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+
+  if (!company) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "No company has been configured yet",
+      },
+      { status: 400 }
+    );
+  }
+
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const product = await tx.product.findFirst({
+        where: {
+          id: productId,
+          companyId: company.id,
+        },
+      });
+
+      if (!product) {
+        throw new Error("Product not found.");
+      }
+
+      if (product.type !== "PRODUCT") {
+        throw new Error(
+          "Opening stock can only be added to products, not services."
+        );
+      }
+
+      if (!product.isActive) {
+        throw new Error(
+          "Cannot add opening stock to an inactive product."
+        );
+      }
+
+      const warehouse =
+        await tx.warehouse.findFirst({
+          where: {
+            id: warehouseId,
+            companyId: company.id,
+            isActive: true,
+          },
+        });
+
+      if (!warehouse) {
+        throw new Error(
+          "Selected warehouse was not found or is inactive."
+        );
+      }
+
+      const existingBatch =
+        await tx.inventoryBatch.findFirst({
+          where: {
+            companyId: company.id,
+            productId,
+            batchNumber,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      if (existingBatch) {
+        throw new Error(
+          `Batch "${batchNumber}" already exists for this product.`
+        );
+      }
+
+      const purchaseDate = body.purchaseDate
+        ? new Date(body.purchaseDate)
+        : new Date();
+
+      if (Number.isNaN(purchaseDate.getTime())) {
+        throw new Error(
+          "Invalid opening stock date."
+        );
+      }
+
+      const batch =
+        await tx.inventoryBatch.create({
+          data: {
+            companyId: company.id,
+            productId,
+            batchNumber,
+            purchaseDate,
+            unitCost,
+            originalQuantity: quantity,
+            isActive: true,
+          },
+        });
+
+      await tx.stockBatch.create({
+        data: {
+          batchId: batch.id,
+          productId,
+          warehouseId,
+          quantity,
+        },
+      });
+
+      const existingStock =
+        await tx.stock.findUnique({
+          where: {
+            productId_warehouseId: {
+              productId,
+              warehouseId,
+            },
+          },
+        });
+
+      const oldQuantity = Number(
+        existingStock?.quantity ?? 0
+      );
+
+      const oldAverageCost = Number(
+        existingStock?.averageCost ?? 0
+      );
+
+      const newQuantity =
+        oldQuantity + quantity;
+
+      const newAverageCost =
+        newQuantity > 0
+          ? (oldQuantity * oldAverageCost +
+              quantity * unitCost) /
+            newQuantity
+          : unitCost;
+
+      await tx.stock.upsert({
+        where: {
+          productId_warehouseId: {
+            productId,
+            warehouseId,
+          },
+        },
+        create: {
+          productId,
+          warehouseId,
+          quantity,
+          averageCost: unitCost,
+        },
+        update: {
+          quantity: newQuantity,
+          averageCost: newAverageCost,
+        },
+      });
+
+      const totalCost =
+        quantity * unitCost;
+
+      const movement =
+        await tx.inventoryMovement.create({
+          data: {
+            companyId: company.id,
+            productId,
+            batchId: batch.id,
+            destinationWarehouseId: warehouseId,
+            type: "OPENING",
+            referenceType: "OPENING",
+            referenceId: batch.id,
+            quantity,
+            unitCost,
+            totalCost,
+            movementDate: purchaseDate,
+            notes:
+              "Opening inventory balance",
+          },
+        });
+
+      return {
+        batch,
+        movement,
+      };
+    }
+  );
+
+  return NextResponse.json(
+    {
+      ok: true,
+      batch: result.batch,
+      movement: result.movement,
+    },
+    { status: 201 }
+  );
+}
+
+
+async function updateOpeningStock(body: any) {
+  const batchId = String(body.batchId ?? "");
+  const warehouseId = String(body.warehouseId ?? "");
+  const batchNumber = String(body.batchNumber ?? "").trim();
+
+  const quantity = decimalNumber(body.quantity);
+  const unitCost = decimalNumber(body.unitCost);
+
+  if (!batchId) {
+    return NextResponse.json(
+      { ok: false, error: "Batch ID is required." },
+      { status: 400 }
+    );
+  }
+
+  if (!warehouseId) {
+    return NextResponse.json(
+      { ok: false, error: "Warehouse is required." },
+      { status: 400 }
+    );
+  }
+
+  if (!batchNumber) {
+    return NextResponse.json(
+      { ok: false, error: "Batch number is required." },
+      { status: 400 }
+    );
+  }
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return NextResponse.json(
+      { ok: false, error: "Quantity must be greater than zero." },
+      { status: 400 }
+    );
+  }
+
+  if (!Number.isFinite(unitCost) || unitCost < 0) {
+    return NextResponse.json(
+      { ok: false, error: "Unit cost cannot be negative." },
+      { status: 400 }
+    );
+  }
+
+  const company = await prisma.company.findFirst({
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (!company) {
+    return NextResponse.json(
+      { ok: false, error: "No company has been configured yet" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const batch = await tx.inventoryBatch.findFirst({
+        where: {
+          id: batchId,
+          companyId: company.id,
+        },
+        include: {
+          stockBatches: true,
+        },
+      });
+
+      if (!batch) {
+        throw new Error("Opening stock batch not found.");
+      }
+
+      const openingMovement =
+        await tx.inventoryMovement.findFirst({
+          where: {
+            batchId: batch.id,
+            type: "OPENING",
+          },
+          orderBy: {
+            movementDate: "asc",
+          },
+        });
+
+      if (!openingMovement) {
+        throw new Error(
+          "This batch does not contain an opening-stock movement."
+        );
+      }
+
+      const otherMovement =
+        await tx.inventoryMovement.findFirst({
+          where: {
+            batchId: batch.id,
+            NOT: {
+              id: openingMovement.id,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      if (otherMovement) {
+        throw new Error(
+          "This opening-stock batch has already been used by another inventory transaction and cannot be edited."
+        );
+      }
+
+      const warehouse = await tx.warehouse.findFirst({
+        where: {
+          id: warehouseId,
+          companyId: company.id,
+          isActive: true,
+        },
+      });
+
+      if (!warehouse) {
+        throw new Error(
+          "Selected warehouse was not found or is inactive."
+        );
+      }
+
+      const duplicateBatch =
+        await tx.inventoryBatch.findFirst({
+          where: {
+            companyId: company.id,
+            productId: batch.productId,
+            batchNumber,
+            NOT: {
+              id: batch.id,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      if (duplicateBatch) {
+        throw new Error(
+          `Batch "${batchNumber}" already exists for this product.`
+        );
+      }
+
+      const purchaseDate = body.purchaseDate
+        ? new Date(body.purchaseDate)
+        : batch.purchaseDate;
+
+      if (Number.isNaN(purchaseDate.getTime())) {
+        throw new Error("Invalid opening stock date.");
+      }
+
+      const oldStockBatch = batch.stockBatches[0];
+
+      if (!oldStockBatch) {
+        throw new Error(
+          "Stock record for this batch could not be found."
+        );
+      }
+
+      const oldWarehouseId = oldStockBatch.warehouseId;
+      const oldQuantity = Number(oldStockBatch.quantity ?? 0);
+
+      const oldStock = await tx.stock.findUnique({
+        where: {
+          productId_warehouseId: {
+            productId: batch.productId,
+            warehouseId: oldWarehouseId,
+          },
+        },
+      });
+
+      if (!oldStock) {
+        throw new Error(
+          "Current stock record for this batch could not be found."
+        );
+      }
+
+      const oldTotalQuantity = Number(oldStock.quantity ?? 0);
+
+      if (oldTotalQuantity < oldQuantity) {
+        throw new Error(
+          "The opening-stock quantity cannot be edited because part of this stock has already been consumed."
+        );
+      }
+
+      const remainingQuantity = oldTotalQuantity - oldQuantity;
+
+      if (remainingQuantity <= 0) {
+        await tx.stock.delete({
+          where: {
+            productId_warehouseId: {
+              productId: batch.productId,
+              warehouseId: oldWarehouseId,
+            },
+          },
+        });
+      } else {
+        await tx.stock.update({
+          where: {
+            productId_warehouseId: {
+              productId: batch.productId,
+              warehouseId: oldWarehouseId,
+            },
+          },
+          data: {
+            quantity: remainingQuantity,
+          },
+        });
+      }
+
+      await tx.stockBatch.delete({
+        where: {
+          id: oldStockBatch.id,
+        },
+      });
+
+      const destinationStock =
+        await tx.stock.findUnique({
+          where: {
+            productId_warehouseId: {
+              productId: batch.productId,
+              warehouseId,
+            },
+          },
+        });
+
+      const destinationOldQuantity = Number(
+        destinationStock?.quantity ?? 0
+      );
+
+      const destinationOldAverageCost = Number(
+        destinationStock?.averageCost ?? 0
+      );
+
+      const destinationNewQuantity =
+        destinationOldQuantity + quantity;
+
+      const destinationNewAverageCost =
+        destinationNewQuantity > 0
+          ? (
+              destinationOldQuantity *
+                destinationOldAverageCost +
+              quantity * unitCost
+            ) / destinationNewQuantity
+          : unitCost;
+
+      await tx.stock.upsert({
+        where: {
+          productId_warehouseId: {
+            productId: batch.productId,
+            warehouseId,
+          },
+        },
+        create: {
+          productId: batch.productId,
+          warehouseId,
+          quantity,
+          averageCost: unitCost,
+        },
+        update: {
+          quantity: destinationNewQuantity,
+          averageCost: destinationNewAverageCost,
+        },
+      });
+
+      await tx.stockBatch.create({
+        data: {
+          batchId: batch.id,
+          productId: batch.productId,
+          warehouseId,
+          quantity,
+        },
+      });
+
+      const updatedBatch =
+        await tx.inventoryBatch.update({
+          where: {
+            id: batch.id,
+          },
+          data: {
+            batchNumber,
+            purchaseDate,
+            unitCost,
+            originalQuantity: quantity,
+            isActive: true,
+          },
+        });
+
+      const updatedMovement =
+        await tx.inventoryMovement.update({
+          where: {
+            id: openingMovement.id,
+          },
+          data: {
+            destinationWarehouseId: warehouseId,
+            quantity,
+            unitCost,
+            totalCost: quantity * unitCost,
+            movementDate: purchaseDate,
+            notes: "Opening inventory balance",
+          },
+        });
+
+      return {
+        batch: updatedBatch,
+        movement: updatedMovement,
+      };
+    });
+
+    return NextResponse.json({
+      ok: true,
+      batch: result.batch,
+      movement: result.movement,
+    });
+  } catch (error) {
+    console.error("updateOpeningStock error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update opening stock.",
+      },
+      { status: 400 }
+    );
+  }
+}
+
+async function deleteOpeningStock(body: any) {
+  const batchId = String(body.batchId ?? "");
+
+  if (!batchId) {
+    return NextResponse.json(
+      { ok: false, error: "Batch ID is required." },
+      { status: 400 }
+    );
+  }
+
+  const company = await prisma.company.findFirst({
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (!company) {
+    return NextResponse.json(
+      { ok: false, error: "No company has been configured yet" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const batch = await tx.inventoryBatch.findFirst({
+        where: {
+          id: batchId,
+          companyId: company.id,
+        },
+        include: {
+          stockBatches: true,
+        },
+      });
+
+      if (!batch) {
+        throw new Error("Opening stock batch not found.");
+      }
+
+      const openingMovement =
+        await tx.inventoryMovement.findFirst({
+          where: {
+            batchId: batch.id,
+            type: "OPENING",
+          },
+          orderBy: {
+            movementDate: "asc",
+          },
+        });
+
+      if (!openingMovement) {
+        throw new Error(
+          "This batch is not an opening-stock batch."
+        );
+      }
+
+      const otherMovement =
+        await tx.inventoryMovement.findFirst({
+          where: {
+            batchId: batch.id,
+            NOT: {
+              id: openingMovement.id,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      if (otherMovement) {
+        throw new Error(
+          "This opening-stock batch has already been used by another inventory transaction and cannot be deleted."
+        );
+      }
+
+      for (const stockBatch of batch.stockBatches) {
+        const stock = await tx.stock.findUnique({
+          where: {
+            productId_warehouseId: {
+              productId: batch.productId,
+              warehouseId: stockBatch.warehouseId,
+            },
+          },
+        });
+
+        if (!stock) {
+          continue;
+        }
+
+        const currentQuantity = Number(stock.quantity ?? 0);
+        const batchQuantity = Number(stockBatch.quantity ?? 0);
+
+        const newQuantity =
+          currentQuantity - batchQuantity;
+
+        if (newQuantity <= 0) {
+          await tx.stock.delete({
+            where: {
+              productId_warehouseId: {
+                productId: batch.productId,
+                warehouseId: stockBatch.warehouseId,
+              },
+            },
+          });
+        } else {
+          await tx.stock.update({
+            where: {
+              productId_warehouseId: {
+                productId: batch.productId,
+                warehouseId: stockBatch.warehouseId,
+              },
+            },
+            data: {
+              quantity: newQuantity,
+            },
+          });
+        }
+      }
+
+      await tx.inventoryMovement.delete({
+        where: {
+          id: openingMovement.id,
+        },
+      });
+
+      await tx.stockBatch.deleteMany({
+        where: {
+          batchId: batch.id,
+        },
+      });
+
+      await tx.inventoryBatch.delete({
+        where: {
+          id: batch.id,
+        },
+      });
+    });
+
+    return NextResponse.json({
+      ok: true,
+      message: "Opening stock deleted successfully.",
+    });
+  } catch (error) {
+    console.error("deleteOpeningStock error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete opening stock.",
+      },
+      { status: 400 }
+    );
+  }
+}
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    if (body.action === "UPDATE_OPENING_STOCK") {
+      const result = await updateOpeningStock(body);
+      return NextResponse.json(result);
+    }
+
+    
+
+    const id = String(body.id ?? "");
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product ID is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const existing =
+      await prisma.product.findFirst({
+        where: {
+          id,
+          companyId: company.id,
+        },
+      });
+
+    if (!existing) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const name = String(
+      body.name ?? existing.name
+    ).trim();
+
+    const sku = String(
+      body.sku ?? existing.sku
+    ).trim();
+
+    if (!name) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product name is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!sku) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "SKU is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const duplicate =
+      await prisma.product.findFirst({
+        where: {
+          companyId: company.id,
+          sku,
+          NOT: {
+            id,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (duplicate) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `A product with SKU "${sku}" already exists.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    const product =
+      await prisma.product.update({
+        where: {
+          id,
+        },
+        data: {
+          name,
+          sku,
+
+          description:
+            body.description === null
+              ? null
+              : String(
+                  body.description ??
+                    existing.description ??
+                    ""
+                ).trim() || null,
+
+          type:
+            body.type === "SERVICE"
+              ? "SERVICE"
+              : "PRODUCT",
+
+          categoryId:
+            body.categoryId
+              ? String(body.categoryId)
+              : null,
+
+          brandId:
+            body.brandId
+              ? String(body.brandId)
+              : null,
+
+          unitId:
+            body.unitId
+              ? String(body.unitId)
+              : null,
+
+          costPrice: decimalNumber(
+            body.costPrice,
+            Number(existing.costPrice)
+          ),
+
+          salePrice: decimalNumber(
+            body.salePrice,
+            Number(existing.salePrice)
+          ),
+
+          reorderLevel: decimalNumber(
+            body.reorderLevel,
+            Number(existing.reorderLevel)
+          ),
+
+          inventoryAccountId:
+            body.inventoryAccountId
+              ? String(body.inventoryAccountId)
+              : null,
+
+          salesAccountId:
+            body.salesAccountId
+              ? String(body.salesAccountId)
+              : null,
+
+          cogsAccountId:
+            body.cogsAccountId
+              ? String(body.cogsAccountId)
+              : null,
+
+          purchaseAccountId:
+            body.purchaseAccountId
+              ? String(body.purchaseAccountId)
+              : null,
+
+          isActive:
+            body.isActive !== false,
+        },
+      });
+
+    return NextResponse.json({
+      ok: true,
+      product,
+    });
+  } catch (error) {
+    console.error("PUT /api/products error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to update product.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 export async function DELETE(
   request: NextRequest
 ) {
   try {
+<<<<<<< HEAD
     const body = await request.json();
 
     if (body.action === "DELETE_OPENING_STOCK") {
       return await deleteOpeningStock(body);
+=======
+    const body = await request.json();
+
+    if (body.action === "DELETE_OPENING_STOCK") {
+      return await deleteOpeningStock(body);
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
     }
 
     const id = String(body.id ?? "");
@@ -7789,6 +9810,7 @@ export async function DELETE(
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 }
 
 
@@ -9581,6 +11603,1800 @@ export async function DELETE(
 
 
 === app\api\sales\customers\[id]\route.ts ===
+=======
+}
+
+
+
+
+
+=== app\api\purchases\bills\route.ts ===
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+/*
+ * ============================================================
+ * PURCHASE BILLS API
+ * ============================================================
+ *
+ * Supports:
+ *
+ * GET    /api/purchases/bills
+ * POST   /api/purchases/bills
+ * PUT    /api/purchases/bills
+ * DELETE /api/purchases/bills?id=...
+ *
+ * Batch-based inventory:
+ *
+ * Purchase Bill
+ *      â†“
+ * Inventory Batch
+ *      â†“
+ * Stock Batch
+ *      â†“
+ * Warehouse Stock
+ *      â†“
+ * Inventory Movement
+ *
+ * IMPORTANT:
+ * COGS is NOT calculated here.
+ * COGS is calculated when a specific batch is selected
+ * on a sales invoice.
+ */
+
+/* ============================================================
+   TYPES
+   ============================================================ */
+
+type PurchaseLineInput = {
+  id?: string;
+
+  productId: string;
+
+  /*
+   * Existing batch can be supplied.
+   *
+   * If batchId is omitted, a new batch will be created.
+   */
+  batchId?: string | null;
+
+  /*
+   * Optional batch number when creating a new batch.
+   * If omitted, the API generates one.
+   */
+  batchNumber?: string | null;
+
+  quantity: number;
+  unitCost: number;
+
+  discount?: number;
+  tax?: number;
+
+  warehouseId: string;
+
+  description?: string | null;
+};
+
+type PurchaseBillInput = {
+  id?: string;
+
+  supplierId: string;
+  billNo: string;
+
+  billDate?: string;
+  dueDate?: string | null;
+
+  status?: "DRAFT" | "POSTED" | "PARTIAL" | "PAID" | "VOID";
+
+  discount?: number;
+  tax?: number;
+
+  notes?: string | null;
+
+  lines: PurchaseLineInput[];
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
+function decimalNumber(value: unknown): number {
+  const number = Number(value ?? 0);
+
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+
+  return number;
+}
+
+function cleanString(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const result = String(value).trim();
+
+  return result.length > 0 ? result : null;
+}
+
+function parseDate(
+  value: unknown,
+  fallback: Date = new Date()
+): Date {
+  if (!value) {
+    return fallback;
+  }
+
+  const date = new Date(String(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+
+  return date;
+}
+
+function calculateLineTotal(line: PurchaseLineInput) {
+  const quantity = decimalNumber(line.quantity);
+  const unitCost = decimalNumber(line.unitCost);
+  const discount = decimalNumber(line.discount);
+  const tax = decimalNumber(line.tax);
+
+  const gross = quantity * unitCost;
+
+  const netBeforeTax = Math.max(0, gross - discount);
+
+  return netBeforeTax + tax;
+}
+
+function generateBatchNumber() {
+  const now = new Date();
+
+  const datePart = now
+    .toISOString()
+    .replace(/[-:TZ.]/g, "")
+    .slice(0, 14);
+
+  const randomPart = Math.random()
+    .toString(36)
+    .substring(2, 7)
+    .toUpperCase();
+
+  return `B-${datePart}-${randomPart}`;
+}
+
+/* ============================================================
+   GET
+   ============================================================ */
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+
+    const id = searchParams.get("id");
+    const search = searchParams.get("search");
+
+    /*
+     * --------------------------------------------------------
+     * SINGLE BILL
+     * --------------------------------------------------------
+     */
+
+    if (id) {
+      const bill = await prisma.purchaseBill.findUnique({
+        where: {
+          id,
+        },
+
+        include: {
+          supplier: true,
+
+          company: true,
+
+          lines: {
+            include: {
+              product: {
+                include: {
+                  unit: true,
+                  brand: true,
+                  category: true,
+                },
+              },
+
+              batch: true,
+
+              warehouse: true,
+            },
+
+            orderBy: {
+              id: "asc",
+            },
+          },
+
+          allocations: {
+            include: {
+              payment: true,
+            },
+          },
+
+          journal: {
+            include: {
+              lines: {
+                include: {
+                  account: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!bill) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Purchase bill not found",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        bill,
+      });
+    }
+
+    /*
+     * --------------------------------------------------------
+     * BILL LIST
+     * --------------------------------------------------------
+     */
+
+    const bills = await prisma.purchaseBill.findMany({
+      where: search
+        ? {
+            OR: [
+              {
+                billNo: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+
+              {
+                supplier: {
+                  name: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+              },
+            ],
+          }
+        : undefined,
+
+      include: {
+        supplier: true,
+
+        lines: {
+          include: {
+            product: true,
+            batch: true,
+            warehouse: true,
+          },
+        },
+
+        allocations: true,
+      },
+
+      orderBy: {
+        billDate: "desc",
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      bills,
+    });
+  } catch (error) {
+    console.error("GET /api/purchases/bills error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load purchase bills",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+/* ============================================================
+   POST
+   ============================================================ */
+
+export async function POST(request: NextRequest) {
+  try {
+    const body =
+      (await request.json()) as PurchaseBillInput;
+
+    /*
+     * --------------------------------------------------------
+     * BASIC VALIDATION
+     * --------------------------------------------------------
+     */
+
+    const supplierId = cleanString(body.supplierId);
+
+    const billNo = cleanString(body.billNo);
+
+    if (!supplierId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!billNo) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Bill number is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!Array.isArray(body.lines) || body.lines.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "At least one purchase item is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * TEMPORARY SINGLE COMPANY CONTEXT
+     * --------------------------------------------------------
+     */
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!company) {
+      throw new Error("No company has been configured yet.");
+    }
+
+    /*
+     * --------------------------------------------------------
+     * SUPPLIER
+     * --------------------------------------------------------
+     */
+
+    const supplier = await prisma.supplier.findFirst({
+      where: {
+        id: supplierId,
+        companyId: company.id,
+      },
+    });
+
+    if (!supplier) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier not found",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * NORMALIZE LINES
+     * --------------------------------------------------------
+     */
+
+    const lines = body.lines.map((line) => {
+      const quantity = decimalNumber(line.quantity);
+      const unitCost = decimalNumber(line.unitCost);
+      const discount = decimalNumber(line.discount);
+      const tax = decimalNumber(line.tax);
+
+      if (!line.productId) {
+        throw new Error(
+          "Every purchase line must have a product"
+        );
+      }
+
+      if (!line.warehouseId) {
+        throw new Error(
+          "Every purchase line must have a warehouse"
+        );
+      }
+
+      if (quantity <= 0) {
+        throw new Error(
+          "Purchase quantity must be greater than zero"
+        );
+      }
+
+      if (unitCost < 0) {
+        throw new Error(
+          "Purchase cost cannot be negative"
+        );
+      }
+
+      if (discount < 0) {
+        throw new Error(
+          "Discount cannot be negative"
+        );
+      }
+
+      if (tax < 0) {
+        throw new Error(
+          "Tax cannot be negative"
+        );
+      }
+
+      return {
+        ...line,
+        quantity,
+        unitCost,
+        discount,
+        tax,
+        total:
+          quantity * unitCost -
+          discount +
+          tax,
+      };
+    });
+
+    /*
+     * --------------------------------------------------------
+     * VALIDATE PRODUCTS AND WAREHOUSES
+     * --------------------------------------------------------
+     */
+
+    const productIds = [
+      ...new Set(lines.map((line) => line.productId)),
+    ];
+
+    const warehouseIds = [
+      ...new Set(lines.map((line) => line.warehouseId)),
+    ];
+
+    const products = await prisma.product.findMany({
+      where: {
+        companyId: company.id,
+        id: {
+          in: productIds,
+        },
+      },
+    });
+
+    const warehouses = await prisma.warehouse.findMany({
+      where: {
+        companyId: company.id,
+        id: {
+          in: warehouseIds,
+        },
+      },
+    });
+
+    if (products.length !== productIds.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "One or more selected products are invalid",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (warehouses.length !== warehouseIds.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "One or more selected warehouses are invalid",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * CALCULATE TOTALS
+     * --------------------------------------------------------
+     */
+
+    const lineSubtotal = lines.reduce(
+      (sum, line) =>
+        sum +
+        line.quantity * line.unitCost,
+      0
+    );
+
+    const lineDiscount = lines.reduce(
+      (sum, line) =>
+        sum + line.discount,
+      0
+    );
+
+    const lineTax = lines.reduce(
+      (sum, line) =>
+        sum + line.tax,
+      0
+    );
+
+    const subtotal = lineSubtotal;
+
+    /*
+     * Bill-level discount/tax are supported as well.
+     *
+     * If the UI sends them, they are added to the
+     * calculated line values.
+     */
+    const billDiscount =
+      decimalNumber(body.discount);
+
+    const billTax =
+      decimalNumber(body.tax);
+
+    const totalDiscount =
+      lineDiscount + billDiscount;
+
+    const totalTax =
+      lineTax + billTax;
+
+    const total =
+      subtotal -
+      totalDiscount +
+      totalTax;
+
+    /*
+     * --------------------------------------------------------
+     * STATUS
+     * --------------------------------------------------------
+     *
+     * Default is DRAFT.
+     *
+     * A draft does NOT affect stock.
+     *
+     * A POSTED purchase DOES affect stock.
+     */
+
+    const status =
+      body.status === "POSTED"
+        ? "POSTED"
+        : "DRAFT";
+
+    /*
+     * --------------------------------------------------------
+     * TRANSACTION
+     * --------------------------------------------------------
+     */
+
+    const result =
+      await prisma.$transaction(
+        async (tx) => {
+          /*
+           * --------------------------------------------------
+           * CREATE PURCHASE BILL
+           * --------------------------------------------------
+           */
+
+          const bill =
+            await tx.purchaseBill.create({
+              data: {
+                companyId: company.id,
+                supplierId: supplier.id,
+                billNo,
+                billDate: parseDate(
+                  body.billDate
+                ),
+                dueDate: body.dueDate
+                  ? parseDate(body.dueDate)
+                  : null,
+
+                status,
+
+                subtotal,
+                discount: totalDiscount,
+                tax: totalTax,
+                total,
+
+                paid: 0,
+                balance: total,
+
+                notes:
+                  cleanString(body.notes),
+
+                lines: {
+                  create: [],
+                },
+              },
+            });
+
+          /*
+           * --------------------------------------------------
+           * PROCESS EACH PURCHASE LINE
+           * --------------------------------------------------
+           */
+
+          for (const line of lines) {
+            /*
+             * Find product.
+             */
+
+            const product =
+              products.find(
+                (item) =>
+                  item.id === line.productId
+              );
+
+            if (!product) {
+              throw new Error(
+                "Product not found"
+              );
+            }
+
+            /*
+             * ------------------------------------------------
+             * BATCH
+             * ------------------------------------------------
+             *
+             * If a batchId was supplied, use the existing batch.
+             *
+             * Otherwise create a new batch.
+             */
+
+            let batch;
+
+            if (line.batchId) {
+              batch =
+                await tx.inventoryBatch.findFirst(
+                  {
+                    where: {
+                      id: line.batchId,
+                      companyId: company.id,
+                      productId: product.id,
+                    },
+                  }
+                );
+
+              if (!batch) {
+                throw new Error(
+                  `Batch not found for product ${product.name}`
+                );
+              }
+
+              /*
+               * Existing batch:
+               *
+               * We intentionally DO NOT silently change its
+               * cost because a batch represents one historical
+               * cost layer.
+               *
+               * If a different cost is supplied, reject it.
+               */
+
+              if (
+                Number(batch.unitCost) !==
+                Number(line.unitCost)
+              ) {
+                throw new Error(
+                  `Batch ${batch.batchNumber} already has a different unit cost`
+                );
+              }
+            } else {
+              /*
+               * Create a new batch.
+               */
+
+              let batchNumber =
+                cleanString(
+                  line.batchNumber
+                );
+
+              if (!batchNumber) {
+                batchNumber =
+                  generateBatchNumber();
+              }
+
+              /*
+               * Make sure the generated batch number
+               * is unique for this company/product.
+               */
+
+              let existing =
+                await tx.inventoryBatch.findFirst(
+                  {
+                    where: {
+                      companyId: company.id,
+                      productId: product.id,
+                      batchNumber,
+                    },
+                  }
+                );
+
+              while (existing) {
+                batchNumber =
+                  generateBatchNumber();
+
+                existing =
+                  await tx.inventoryBatch.findFirst(
+                    {
+                      where: {
+                        companyId: company.id,
+                        productId: product.id,
+                        batchNumber,
+                      },
+                    }
+                  );
+              }
+
+              batch =
+                await tx.inventoryBatch.create(
+                  {
+                    data: {
+                      companyId:
+                        company.id,
+
+                      productId:
+                        product.id,
+
+                      batchNumber,
+
+                      purchaseBillId:
+                        bill.id,
+
+                      supplierId:
+                        supplier.id,
+
+                      purchaseDate:
+                        bill.billDate,
+
+                      unitCost:
+                        line.unitCost,
+
+                      originalQuantity:
+                        line.quantity,
+
+                      isActive: true,
+                    },
+                  }
+                );
+            }
+
+            /*
+             * ------------------------------------------------
+             * PURCHASE BILL LINE
+             * ------------------------------------------------
+             */
+
+            await tx.purchaseBillLine.create(
+              {
+                data: {
+                  billId: bill.id,
+
+                  productId:
+                    product.id,
+
+                  batchId:
+                    batch.id,
+
+                  description:
+                    cleanString(
+                      line.description
+                    ),
+
+                  quantity:
+                    line.quantity,
+
+                  unitCost:
+                    line.unitCost,
+
+                  discount:
+                    line.discount,
+
+                  tax:
+                    line.tax,
+
+                  total:
+                    line.total,
+
+                  warehouseId:
+                    line.warehouseId,
+                },
+              }
+            );
+
+            /*
+             * ------------------------------------------------
+             * ONLY POSTED PURCHASES AFFECT INVENTORY
+             * ------------------------------------------------
+             */
+
+            if (status === "POSTED") {
+              /*
+               * ----------------------------------------------
+               * BATCH STOCK
+               * ----------------------------------------------
+               */
+
+              const existingBatchStock =
+                await tx.stockBatch.findUnique(
+                  {
+                    where: {
+                      batchId_warehouseId: {
+                        batchId:
+                          batch.id,
+
+                        warehouseId:
+                          line.warehouseId,
+                      },
+                    },
+                  }
+                );
+
+              if (
+                existingBatchStock
+              ) {
+                await tx.stockBatch.update(
+                  {
+                    where: {
+                      id:
+                        existingBatchStock.id,
+                    },
+
+                    data: {
+                      quantity: {
+                        increment:
+                          line.quantity,
+                      },
+                    },
+                  }
+                );
+              } else {
+                await tx.stockBatch.create(
+                  {
+                    data: {
+                      batchId:
+                        batch.id,
+
+                      productId:
+                        product.id,
+
+                      warehouseId:
+                        line.warehouseId,
+
+                      quantity:
+                        line.quantity,
+                    },
+                  }
+                );
+              }
+
+              /*
+               * ----------------------------------------------
+               * TOTAL PRODUCT STOCK
+               * ----------------------------------------------
+               */
+
+              const existingStock =
+                await tx.stock.findUnique(
+                  {
+                    where: {
+                      productId_warehouseId: {
+                        productId:
+                          product.id,
+
+                        warehouseId:
+                          line.warehouseId,
+                      },
+                    },
+                  }
+                );
+
+              if (existingStock) {
+                const oldQuantity =
+                  Number(
+                    existingStock.quantity
+                  );
+
+                const oldAverageCost =
+                  Number(
+                    existingStock.averageCost
+                  );
+
+                const newQuantity =
+                  oldQuantity +
+                  line.quantity;
+
+                const newAverageCost =
+                  newQuantity > 0
+                    ? (
+                        oldQuantity *
+                          oldAverageCost +
+                        line.quantity *
+                          line.unitCost
+                      ) /
+                      newQuantity
+                    : line.unitCost;
+
+                await tx.stock.update(
+                  {
+                    where: {
+                      id:
+                        existingStock.id,
+                    },
+
+                    data: {
+                      quantity:
+                        newQuantity,
+
+                      averageCost:
+                        newAverageCost,
+                    },
+                  }
+                );
+              } else {
+                await tx.stock.create(
+                  {
+                    data: {
+                      productId:
+                        product.id,
+
+                      warehouseId:
+                        line.warehouseId,
+
+                      quantity:
+                        line.quantity,
+
+                      averageCost:
+                        line.unitCost,
+                    },
+                  }
+                );
+              }
+
+              /*
+               * ----------------------------------------------
+               * INVENTORY MOVEMENT
+               * ----------------------------------------------
+               */
+
+              await tx.inventoryMovement.create(
+                {
+                  data: {
+                    companyId:
+                      company.id,
+
+                    productId:
+                      product.id,
+
+                    batchId:
+                      batch.id,
+
+                    destinationWarehouseId:
+                      line.warehouseId,
+
+                    type: "PURCHASE",
+
+                    referenceType:
+                      "PURCHASE",
+
+                    referenceId:
+                      bill.id,
+
+                    quantity:
+                      line.quantity,
+
+                    unitCost:
+                      line.unitCost,
+
+                    totalCost:
+                      line.quantity *
+                      line.unitCost,
+
+                    movementDate:
+                      bill.billDate,
+
+                    notes:
+                      `Purchase Bill ${bill.billNo}`,
+                  },
+                }
+              );
+            }
+          }
+
+          /*
+           * --------------------------------------------------
+           * RETURN COMPLETE BILL
+           * --------------------------------------------------
+           */
+
+          return tx.purchaseBill.findUnique(
+            {
+              where: {
+                id: bill.id,
+              },
+
+              include: {
+                supplier: true,
+
+                lines: {
+                  include: {
+                    product: true,
+                    batch: true,
+                    warehouse: true,
+                  },
+                },
+              },
+            }
+          );
+        }
+      );
+
+    return NextResponse.json(
+      {
+        ok: true,
+        bill: result,
+      },
+      {
+        status: 201,
+      }
+    );
+  } catch (error) {
+    console.error(
+      "POST /api/purchases/bills error:",
+      error
+    );
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to create purchase bill";
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: message,
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+/* ============================================================
+   PUT
+   ============================================================ */
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body =
+      (await request.json()) as PurchaseBillInput;
+
+    if (!body.id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Purchase bill ID is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const existing =
+      await prisma.purchaseBill.findUnique({
+        where: {
+          id: body.id,
+        },
+
+        include: {
+          lines: true,
+        },
+      });
+
+    if (!existing) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Purchase bill not found",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * IMPORTANT
+     * --------------------------------------------------------
+     *
+     * Posted bills are protected from ordinary editing.
+     *
+     * This prevents inventory corruption.
+     *
+     * Later we can implement a proper "Reverse and Edit"
+     * workflow.
+     */
+
+    if (
+      existing.status === "POSTED" ||
+      existing.status === "PARTIAL" ||
+      existing.status === "PAID"
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Posted purchase bills cannot be edited directly. Reverse the bill first.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    if (!body.supplierId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !Array.isArray(body.lines) ||
+      body.lines.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "At least one purchase line is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const company =
+      await prisma.company.findFirst({
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "No company has been configured",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!company) {
+      throw new Error("No company has been configured yet.");
+    }
+
+    const supplier =
+      await prisma.supplier.findFirst({
+        where: {
+          id: body.supplierId,
+          companyId: company.id,
+        },
+      });
+
+    if (!supplier) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier not found",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    const lines = body.lines.map(
+      (line) => {
+        const quantity =
+          decimalNumber(
+            line.quantity
+          );
+
+        const unitCost =
+          decimalNumber(
+            line.unitCost
+          );
+
+        const discount =
+          decimalNumber(
+            line.discount
+          );
+
+        const tax =
+          decimalNumber(line.tax);
+
+        if (quantity <= 0) {
+          throw new Error(
+            "Quantity must be greater than zero"
+          );
+        }
+
+        if (unitCost < 0) {
+          throw new Error(
+            "Unit cost cannot be negative"
+          );
+        }
+
+        if (!line.productId) {
+          throw new Error(
+            "Product is required"
+          );
+        }
+
+        if (!line.warehouseId) {
+          throw new Error(
+            "Warehouse is required"
+          );
+        }
+
+        return {
+          ...line,
+          quantity,
+          unitCost,
+          discount,
+          tax,
+          total:
+            quantity * unitCost -
+            discount +
+            tax,
+        };
+      }
+    );
+
+    const subtotal =
+      lines.reduce(
+        (sum, line) =>
+          sum +
+          line.quantity *
+            line.unitCost,
+        0
+      );
+
+    const lineDiscount =
+      lines.reduce(
+        (sum, line) =>
+          sum + line.discount,
+        0
+      );
+
+    const lineTax =
+      lines.reduce(
+        (sum, line) =>
+          sum + line.tax,
+        0
+      );
+
+    const billDiscount =
+      decimalNumber(body.discount);
+
+    const billTax =
+      decimalNumber(body.tax);
+
+    const discount =
+      lineDiscount +
+      billDiscount;
+
+    const tax =
+      lineTax +
+      billTax;
+
+    const total =
+      subtotal -
+      discount +
+      tax;
+
+    const updated =
+      await prisma.$transaction(
+        async (tx) => {
+          /*
+           * Delete old draft lines.
+           *
+           * Batches are NOT deleted because an existing
+           * batch may have been created by this draft.
+           * Unused batches remain harmless and can later
+           * be cleaned by an inventory utility.
+           */
+
+          await tx.purchaseBillLine.deleteMany(
+            {
+              where: {
+                billId: String(body.id),
+              },
+            }
+          );
+
+          /*
+           * Update header.
+           */
+
+          await tx.purchaseBill.update(
+            {
+              where: {
+                id: body.id,
+              },
+
+              data: {
+                supplierId:
+                  supplier.id,
+
+                billNo:
+                  cleanString(
+                    body.billNo
+                  ) ??
+                  existing.billNo,
+
+                billDate:
+                  parseDate(
+                    body.billDate,
+                    existing.billDate
+                  ),
+
+                dueDate:
+                  body.dueDate
+                    ? parseDate(
+                        body.dueDate
+                      )
+                    : null,
+
+                subtotal,
+                discount,
+                tax,
+                total,
+
+                balance:
+                  total -
+                  Number(existing.paid),
+
+                notes:
+                  cleanString(
+                    body.notes
+                  ),
+              },
+            }
+          );
+
+          /*
+           * Recreate lines.
+           */
+
+          for (const line of lines) {
+            let batch;
+
+            if (line.batchId) {
+              batch =
+                await tx.inventoryBatch.findFirst(
+                  {
+                    where: {
+                      id:
+                        line.batchId,
+
+                      companyId:
+                        company.id,
+
+                      productId:
+                        line.productId,
+                    },
+                  }
+                );
+
+              if (!batch) {
+                throw new Error(
+                  "Selected batch not found"
+                );
+              }
+
+              if (
+                Number(
+                  batch.unitCost
+                ) !==
+                Number(
+                  line.unitCost
+                )
+              ) {
+                throw new Error(
+                  `Batch ${batch.batchNumber} has a different cost`
+                );
+              }
+            } else {
+              let batchNumber =
+                cleanString(
+                  line.batchNumber
+                ) ??
+                generateBatchNumber();
+
+              let existingBatch =
+                await tx.inventoryBatch.findFirst(
+                  {
+                    where: {
+                      companyId:
+                        company.id,
+
+                      productId:
+                        line.productId,
+
+                      batchNumber,
+                    },
+                  }
+                );
+
+              while (existingBatch) {
+                batchNumber =
+                  generateBatchNumber();
+
+                existingBatch =
+                  await tx.inventoryBatch.findFirst(
+                    {
+                      where: {
+                        companyId:
+                          company.id,
+
+                        productId:
+                          line.productId,
+
+                        batchNumber,
+                      },
+                    }
+                  );
+              }
+
+              batch =
+                await tx.inventoryBatch.create(
+                  {
+                    data: {
+                      companyId:
+                        company.id,
+
+                      productId:
+                        line.productId,
+
+                      batchNumber,
+
+                      purchaseBillId: String(body.id),
+
+                      supplierId:
+                        supplier.id,
+
+                      purchaseDate:
+                        parseDate(
+                          body.billDate
+                        ),
+
+                      unitCost:
+                        line.unitCost,
+
+                      originalQuantity:
+                        line.quantity,
+
+                      isActive: true,
+                    },
+                  }
+                );
+            }
+
+            await tx.purchaseBillLine.create(
+              {
+                data: {
+                 billId: String(body.id),
+
+                  productId:
+                    line.productId,
+
+                  batchId:
+                    batch.id,
+
+                  description:
+                    cleanString(
+                      line.description
+                    ),
+
+                  quantity:
+                    line.quantity,
+
+                  unitCost:
+                    line.unitCost,
+
+                  discount:
+                    line.discount,
+
+                  tax:
+                    line.tax,
+
+                  total:
+                    line.total,
+
+                  warehouseId:
+                    line.warehouseId,
+                },
+              }
+            );
+          }
+
+          return tx.purchaseBill.findUnique(
+            {
+              where: {
+                id: body.id,
+              },
+
+              include: {
+                supplier: true,
+
+                lines: {
+                  include: {
+                    product: true,
+                    batch: true,
+                    warehouse: true,
+                  },
+                },
+              },
+            }
+          );
+        }
+      );
+
+    return NextResponse.json({
+      ok: true,
+      bill: updated,
+    });
+  } catch (error) {
+    console.error(
+      "PUT /api/purchases/bills error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update purchase bill",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+/* ============================================================
+   DELETE
+   ============================================================ */
+
+export async function DELETE(
+  request: NextRequest
+) {
+  try {
+    const { searchParams } =
+      new URL(request.url);
+
+    const id =
+      searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Purchase bill ID is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const bill =
+      await prisma.purchaseBill.findUnique(
+        {
+          where: {
+            id,
+          },
+
+          include: {
+            allocations: true,
+            lines: true,
+          },
+        }
+      );
+
+    if (!bill) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Purchase bill not found",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * PROTECT POSTED BILLS
+     * --------------------------------------------------------
+     *
+     * A posted bill may already have:
+     *
+     * - stock
+     * - batches
+     * - inventory movements
+     * - supplier payable
+     * - journal entries
+     *
+     * Therefore it cannot simply be deleted.
+     */
+
+    if (
+      bill.status === "POSTED" ||
+      bill.status === "PARTIAL" ||
+      bill.status === "PAID"
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Posted purchase bills cannot be deleted. Reverse the purchase first.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    if (bill.allocations.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "This purchase bill has payments allocated to it and cannot be deleted.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    await prisma.$transaction(
+      async (tx) => {
+        /*
+         * Draft lines cascade from the bill.
+         */
+
+        await tx.purchaseBill.delete({
+          where: {
+            id,
+          },
+        });
+
+        /*
+         * Remove batches that were created specifically
+         * by this draft purchase and have never been used.
+         */
+
+        await tx.inventoryBatch.deleteMany({
+          where: {
+            purchaseBillId: id,
+
+            stockBatches: {
+              none: {
+                quantity: {
+                  gt: 0,
+                },
+              },
+            },
+
+            salesLines: {
+              none: {},
+            },
+          },
+        });
+      }
+    );
+
+    return NextResponse.json({
+      ok: true,
+      message:
+        "Purchase bill deleted successfully",
+    });
+  } catch (error) {
+    console.error(
+      "DELETE /api/purchases/bills error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete purchase bill",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+
+
+
+
+=== app\api\sales\customers\[id]\route.ts ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
@@ -9697,10 +13513,17 @@ export async function DELETE(
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 }
 
 
 === app\api\sales\customers\route.ts ===
+=======
+}
+
+
+=== app\api\sales\customers\route.ts ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
@@ -9759,10 +13582,17 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 }
 
 
 === app\api\settings\route.ts ===
+=======
+}
+
+
+=== app\api\settings\route.ts ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
@@ -9924,6 +13754,7 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 }
 
 
@@ -10382,6 +14213,466 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 === prisma\schema.prisma ===
+=======
+}
+
+
+
+=== app\api\stock\route.ts ===
+import { NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+export async function GET() {
+  try {
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const [stock, warehouses, products] = await Promise.all([
+      prisma.stock.findMany({
+        where: {
+          product: {
+            companyId: company.id,
+          },
+        },
+        include: {
+          product: {
+            include: {
+              category: true,
+              brand: true,
+              unit: true,
+            },
+          },
+          warehouse: true,
+        },
+        orderBy: [
+          {
+            warehouse: {
+              name: "asc",
+            },
+          },
+          {
+            product: {
+              name: "asc",
+            },
+          },
+        ],
+      }),
+
+      prisma.warehouse.findMany({
+        where: {
+          companyId: company.id,
+          isActive: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      }),
+
+      prisma.product.findMany({
+        where: {
+          companyId: company.id,
+          isActive: true,
+        },
+        include: {
+          category: true,
+          brand: true,
+          unit: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      }),
+    ]);
+
+    return NextResponse.json({
+      ok: true,
+      stock,
+      warehouses,
+      products,
+    });
+  } catch (error) {
+    console.error("GET /api/stock error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load stock",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+=== app\api\suppliers\route.ts ===
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+/*
+ * ============================================================
+ * SUPPLIERS API
+ * ============================================================
+ *
+ * GET  /api/suppliers
+ * POST /api/suppliers
+ *
+ * Used by:
+ * - Purchase Bills
+ * - Supplier module
+ * - Supplier payments
+ */
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+
+    const search = searchParams.get("search");
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const suppliers = await prisma.supplier.findMany({
+      where: {
+        companyId: company.id,
+
+        ...(search
+          ? {
+              OR: [
+                {
+                  name: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  email: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  phone: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      suppliers,
+    });
+  } catch (error) {
+    console.error("GET /api/suppliers error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load suppliers",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    const name =
+      typeof body.name === "string"
+        ? body.name.trim()
+        : "";
+
+    if (!name) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier name is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const supplier = await prisma.supplier.create({
+      data: {
+        companyId: company.id,
+        name,
+        email:
+          typeof body.email === "string" &&
+          body.email.trim()
+            ? body.email.trim()
+            : null,
+        phone:
+          typeof body.phone === "string" &&
+          body.phone.trim()
+            ? body.phone.trim()
+            : null,
+        address:
+          typeof body.address === "string" &&
+          body.address.trim()
+            ? body.address.trim()
+            : null,
+        city:
+          typeof body.city === "string" &&
+          body.city.trim()
+            ? body.city.trim()
+            : null,
+        taxNumber:
+          typeof body.taxNumber === "string" &&
+          body.taxNumber.trim()
+            ? body.taxNumber.trim()
+            : null,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        supplier,
+      },
+      {
+        status: 201,
+      }
+    );
+  } catch (error) {
+    console.error("POST /api/suppliers error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create supplier",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+=== app\api\warehouses\route.ts ===
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+export async function GET() {
+  try {
+    const warehouses = await prisma.warehouse.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      warehouses,
+    });
+  } catch (error) {
+    console.error("GET /api/warehouses error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load warehouses",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    const name = String(body.name ?? "").trim();
+    const code = String(body.code ?? "").trim().toUpperCase();
+
+    if (!name) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Warehouse name is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!code) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Warehouse code is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * Temporary single-company setup.
+     *
+     * We will replace this with authenticated/company context
+     * once user/company authentication is implemented.
+     */
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const existingWarehouse = await prisma.warehouse.findUnique({
+      where: {
+        companyId_code: {
+          companyId: company.id,
+          code,
+        },
+      },
+    });
+
+    if (existingWarehouse) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "A warehouse with this code already exists",
+        },
+        { status: 409 }
+      );
+    }
+
+    const warehouse = await prisma.warehouse.create({
+      data: {
+        companyId: company.id,
+        name,
+        code,
+        address: body.address
+          ? String(body.address).trim()
+          : null,
+        city: body.city
+          ? String(body.city).trim()
+          : null,
+        isActive: body.isActive !== false,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        warehouse,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("POST /api/warehouses error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to create warehouse",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+=== app\lib\prisma.ts ===
+import "dotenv/config";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@/app/generated/prisma/client";
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not defined");
+}
+
+const adapter = new PrismaPg({
+  connectionString,
+});
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    adapter,
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
+
+=== prisma\schema.prisma ===
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
 generator client {
   provider = "prisma-client"
   output   = "../app/generated/prisma"
@@ -11463,5 +15754,10 @@ model CompanySettings {
 
   @@index([companyId])
 }
+<<<<<<< HEAD
 
 
+=======
+
+
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434

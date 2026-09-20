@@ -13,4 +13,8 @@ schema = schema.replace(/model Session\s*\{([^}]+)\}/g, (match, inner) => {
     return match;
 });
 
+<<<<<<< HEAD
 fs.writeFileSync(schemaPath, schema, 'utf8');
+=======
+fs.writeFileSync(schemaPath, schema, 'utf8');
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434

@@ -24,4 +24,8 @@ if (fs.existsSync(loginPath)) {
     code = code.replace(/id:\s*crypto\.randomUUID\(\),?/g, '');
     fs.writeFileSync(loginPath, code, 'utf8');
     console.log('✓ Cleaned up app/api/auth/login/route.ts syntax');
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434

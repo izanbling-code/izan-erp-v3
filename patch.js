@@ -14,4 +14,8 @@ if (!schema.includes('enum OrderStatus')) {
 }
 
 fs.writeFileSync(path, schema, 'utf8');
+<<<<<<< HEAD
 console.log('Schema successfully patched without errors!');
+=======
+console.log('Schema successfully patched without errors!');
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434

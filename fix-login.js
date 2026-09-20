@@ -33,4 +33,8 @@ if (fs.existsSync(loginPath)) {
         fs.writeFileSync(loginPath, code, 'utf8');
         console.log('✓ Successfully injected explicit session ID into login route.');
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434

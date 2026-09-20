@@ -64,4 +64,8 @@ enum PeriodStatus {
 }
 
 fs.writeFileSync(schemaPath, schema.trim() + '\n', 'utf8');
+<<<<<<< HEAD
 console.log('✓ prisma/schema.prisma successfully cleaned and updated.');
+=======
+console.log('✓ prisma/schema.prisma successfully cleaned and updated.');
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434

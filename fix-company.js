@@ -25,4 +25,8 @@ if (!schema.includes('model Company')) {
     console.log('✓ Added Company model to schema.prisma.');
 } else {
     console.log('✓ Company model already exists.');
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434

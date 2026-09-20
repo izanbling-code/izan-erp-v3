@@ -53,4 +53,8 @@ if (fs.existsSync(loginPath)) {
     }
 }
 
+<<<<<<< HEAD
 console.log('All patches applied successfully!');
+=======
+console.log('All patches applied successfully!');
+>>>>>>> 3ceb2f10778766d22e4f70de8c0696a63a885434
