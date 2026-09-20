@@ -1,0 +1,1237 @@
+﻿"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type Customer = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+};
+
+type Product = {
+  id: string;
+  name: string;
+  sku?: string | null;
+  costPrice?: number | string | null;
+  category?: {
+    id: string;
+    name: string;
+  } | null;
+  brand?: {
+    id: string;
+    name: string;
+  } | null;
+  unit?: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+type Warehouse = {
+  id: string;
+  name: string;
+  code?: string | null;
+};
+
+type StockRecord = {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  quantity: number | string;
+  averageCost?: number | string | null;
+  product?: Product;
+  warehouse?: Warehouse;
+};
+
+type InvoiceLine = {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  tax: number;
+};
+
+function money(value: number) {
+  return `Rs. ${value.toFixed(2)}`;
+}
+
+function numberValue(value: unknown) {
+  const number = Number(value ?? 0);
+
+  return Number.isFinite(number) ? number : 0;
+}
+
+function createLine(): InvoiceLine {
+  return {
+    id: `${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}`,
+    productId: "",
+    warehouseId: "",
+    quantity: 1,
+    unitPrice: 0,
+    discount: 0,
+    tax: 0,
+  };
+}
+
+export default function NewSalesInvoicePage() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [stock, setStock] = useState<StockRecord[]>([]);
+
+  const [customerId, setCustomerId] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [dueDate, setDueDate] = useState("");
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [lines, setLines] = useState<InvoiceLine[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [customerError, setCustomerError] = useState("");
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [customersResponse, stockResponse] =
+          await Promise.all([
+            fetch("/api/sales/customers"),
+            fetch("/api/stock"),
+          ]);
+
+        if (!customersResponse.ok) {
+          throw new Error("Failed to load customers");
+        }
+
+        if (!stockResponse.ok) {
+          throw new Error("Failed to load inventory");
+        }
+
+        const customersData =
+          await customersResponse.json();
+
+        const stockData =
+          await stockResponse.json();
+
+        if (!stockData.ok) {
+          throw new Error(
+            stockData.error ||
+              "Failed to load inventory"
+          );
+        }
+
+        setCustomers(
+          Array.isArray(customersData)
+            ? customersData
+            : []
+        );
+
+        setProducts(
+          Array.isArray(stockData.products)
+            ? stockData.products
+            : []
+        );
+
+        setWarehouses(
+          Array.isArray(stockData.warehouses)
+            ? stockData.warehouses
+            : []
+        );
+
+        setStock(
+          Array.isArray(stockData.stock)
+            ? stockData.stock
+            : []
+        );
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load invoice data"
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, []);
+
+  function addItem() {
+    setLines((current) => [
+      ...current,
+      createLine(),
+    ]);
+  }
+
+  function removeItem(id: string) {
+    setLines((current) =>
+      current.filter((line) => line.id !== id)
+    );
+  }
+
+  function updateLine(
+    id: string,
+    field: keyof InvoiceLine,
+    value: string | number
+  ) {
+    setLines((current) =>
+      current.map((line) => {
+        if (line.id !== id) {
+          return line;
+        }
+
+        return {
+          ...line,
+          [field]: value,
+        };
+      })
+    );
+  }
+
+  function handleProductChange(
+    lineId: string,
+    productId: string
+  ) {
+    const product = products.find(
+      (item) => item.id === productId
+    );
+
+    setLines((current) =>
+      current.map((line) => {
+        if (line.id !== lineId) {
+          return line;
+        }
+
+        const matchingStock = stock.find(
+          (item) =>
+            item.productId === productId &&
+            item.warehouseId === line.warehouseId
+        );
+
+        const averageCost =
+          numberValue(
+            matchingStock?.averageCost
+          );
+
+        return {
+          ...line,
+          productId,
+          unitPrice:
+            averageCost > 0
+              ? averageCost
+              : numberValue(
+                  product?.costPrice
+                ),
+        };
+      })
+    );
+  }
+
+  function handleWarehouseChange(
+    lineId: string,
+    warehouseId: string
+  ) {
+    setLines((current) =>
+      current.map((line) => {
+        if (line.id !== lineId) {
+          return line;
+        }
+
+        return {
+          ...line,
+          warehouseId,
+        };
+      })
+    );
+  }
+
+  function getAvailableStock(
+    productId: string,
+    warehouseId: string
+  ) {
+    if (!productId || !warehouseId) {
+      return 0;
+    }
+
+    const record = stock.find(
+      (item) =>
+        item.productId === productId &&
+        item.warehouseId === warehouseId
+    );
+
+    return numberValue(record?.quantity);
+  }
+
+  function getLineTotal(line: InvoiceLine) {
+    const gross =
+      line.quantity * line.unitPrice;
+
+    const afterDiscount =
+      Math.max(
+        0,
+        gross - line.discount
+      );
+
+    return afterDiscount + line.tax;
+  }
+
+  const totals = useMemo(() => {
+    let subtotal = 0;
+    let discount = 0;
+    let tax = 0;
+
+    for (const line of lines) {
+      subtotal +=
+        line.quantity *
+        line.unitPrice;
+
+      discount += line.discount;
+      tax += line.tax;
+    }
+
+    const total =
+      subtotal -
+      discount +
+      tax;
+
+    return {
+      subtotal,
+      discount,
+      tax,
+      total,
+    };
+  }, [lines]);
+
+  function validateInvoice() {
+    setCustomerError("");
+    setError("");
+
+    if (!customerId) {
+      setCustomerError(
+        "Please select a customer."
+      );
+      return false;
+    }
+
+    if (lines.length === 0) {
+      setError(
+        "Please add at least one product."
+      );
+      return false;
+    }
+
+    for (const line of lines) {
+      if (!line.productId) {
+        setError(
+          "Please select a product for every invoice line."
+        );
+        return false;
+      }
+
+      if (!line.warehouseId) {
+        setError(
+          "Please select a warehouse for every invoice line."
+        );
+        return false;
+      }
+
+      if (line.quantity <= 0) {
+        setError(
+          "Quantity must be greater than zero."
+        );
+        return false;
+      }
+
+      const available =
+        getAvailableStock(
+          line.productId,
+          line.warehouseId
+        );
+
+      if (line.quantity > available) {
+        const product =
+          products.find(
+            (item) =>
+              item.id === line.productId
+          );
+
+        setError(
+          `${product?.name || "Product"} has only ${available} available in the selected warehouse.`
+        );
+
+        return false;
+      }
+
+      if (line.unitPrice < 0) {
+        setError(
+          "Unit price cannot be negative."
+        );
+        return false;
+      }
+
+      if (line.discount < 0) {
+        setError(
+          "Discount cannot be negative."
+        );
+        return false;
+      }
+
+      if (line.tax < 0) {
+        setError(
+          "Tax cannot be negative."
+        );
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function handleSaveDraft() {
+    if (!validateInvoice()) {
+      return;
+    }
+
+    alert(
+      "Invoice builder is working. Save Draft API will be connected in the next step."
+    );
+  }
+
+  function handlePostInvoice() {
+    if (!validateInvoice()) {
+      return;
+    }
+
+    alert(
+      "Invoice validation passed. Posting will be connected later."
+    );
+  }
+
+  const inputStyle = {
+    width: "100%",
+    padding: "10px 12px",
+    border: "1px solid #d8dee8",
+    borderRadius: "8px",
+    background: "#ffffff",
+    color: "#172033",
+    fontSize: "14px",
+    outline: "none",
+    boxSizing: "border-box" as const,
+  };
+
+  const tableInputStyle = {
+    width: "100%",
+    padding: "9px 10px",
+    border: "1px solid #d8dee8",
+    borderRadius: "8px",
+    background: "#ffffff",
+    color: "#172033",
+    fontSize: "13px",
+    outline: "none",
+    boxSizing: "border-box" as const,
+  };
+
+  return (
+    <div className="sales-page">
+      <header className="sales-page-header">
+        <div>
+          <span className="sales-eyebrow">
+            Sales / Transactions / New
+          </span>
+
+          <h1>New Sales Invoice</h1>
+
+          <p>
+            Create a new customer sales invoice.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            style={{
+              border: "1px solid #d8dee8",
+              background: "#ffffff",
+              color: "#344054",
+              padding: "10px 15px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: 700,
+              fontSize: "14px",
+            }}
+          >
+            Save Draft
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePostInvoice}
+            className="sales-primary-button"
+          >
+            Post Invoice
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div
+          style={{
+            marginBottom: "18px",
+            padding: "12px 15px",
+            borderRadius: "8px",
+            border: "1px solid #f1c0c0",
+            background: "#fff7f7",
+            color: "#b42318",
+            fontSize: "13px",
+            fontWeight: 600,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <section className="sales-panel">
+        <div
+          style={{
+            padding: "20px 24px",
+            borderBottom: "1px solid #edf0f5",
+            background: "#fbfcfe",
+          }}
+        >
+          <span className="sales-eyebrow">
+            Sales
+          </span>
+
+          <h2
+            style={{
+              margin: "5px 0 0",
+              color: "#172033",
+              fontSize: "19px",
+            }}
+          >
+            Invoice Details
+          </h2>
+        </div>
+
+        <div
+          style={{
+            padding: "24px",
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(2, minmax(0, 1fr))",
+            gap: "20px",
+          }}
+        >
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "7px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#344054",
+            }}
+          >
+            <span>Customer</span>
+
+            <select
+              value={customerId}
+              onChange={(event) => {
+                setCustomerId(
+                  event.target.value
+                );
+                setCustomerError("");
+              }}
+              style={inputStyle}
+            >
+              <option value="">
+                {loading
+                  ? "Loading customers..."
+                  : "Select customer"}
+              </option>
+
+              {customers.map(
+                (customer) => (
+                  <option
+                    key={customer.id}
+                    value={customer.id}
+                  >
+                    {customer.name}
+                  </option>
+                )
+              )}
+            </select>
+
+            {customerError && (
+              <span
+                style={{
+                  color: "#b42318",
+                  fontSize: "12px",
+                }}
+              >
+                {customerError}
+              </span>
+            )}
+          </label>
+
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "7px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#344054",
+            }}
+          >
+            <span>Invoice Number</span>
+
+            <input
+              value={invoiceNo}
+              onChange={(event) =>
+                setInvoiceNo(
+                  event.target.value
+                )
+              }
+              type="text"
+              placeholder="e.g. INV-0001"
+              style={inputStyle}
+            />
+          </label>
+
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "7px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#344054",
+            }}
+          >
+            <span>Invoice Date</span>
+
+            <input
+              value={invoiceDate}
+              onChange={(event) =>
+                setInvoiceDate(
+                  event.target.value
+                )
+              }
+              type="date"
+              style={inputStyle}
+            />
+          </label>
+
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "7px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#344054",
+            }}
+          >
+            <span>Due Date</span>
+
+            <input
+              value={dueDate}
+              onChange={(event) =>
+                setDueDate(
+                  event.target.value
+                )
+              }
+              type="date"
+              style={inputStyle}
+            />
+          </label>
+
+          <label
+            style={{
+              gridColumn: "1 / -1",
+              display: "flex",
+              flexDirection: "column",
+              gap: "7px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#344054",
+            }}
+          >
+            <span>Notes</span>
+
+            <input
+              value={notes}
+              onChange={(event) =>
+                setNotes(
+                  event.target.value
+                )
+              }
+              type="text"
+              placeholder="Optional notes"
+              style={inputStyle}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section
+        className="sales-panel"
+        style={{
+          marginTop: "20px",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "20px 24px",
+            borderBottom: "1px solid #edf0f5",
+            background: "#fbfcfe",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px",
+          }}
+        >
+          <div>
+            <span className="sales-eyebrow">
+              Inventory
+            </span>
+
+            <h2
+              style={{
+                margin: "5px 0 0",
+                color: "#172033",
+                fontSize: "19px",
+              }}
+            >
+              Invoice Items
+            </h2>
+
+            <p
+              style={{
+                margin: "5px 0 0",
+                color: "#667085",
+                fontSize: "13px",
+              }}
+            >
+              Add products and select the warehouse
+              from which the stock will be sold.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={addItem}
+            className="sales-primary-button"
+          >
+            + Add Item
+          </button>
+        </div>
+
+        {lines.length === 0 ? (
+          <div
+            style={{
+              padding: "20px 24px 24px",
+            }}
+          >
+            <div
+              style={{
+                minHeight: "220px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                border: "1px dashed #d8dee8",
+                borderRadius: "12px",
+                background: "#fbfcfe",
+                padding: "30px",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    margin: "0 auto 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "50%",
+                    background: "#f0ebf7",
+                    color: "#7b61a8",
+                    fontSize: "24px",
+                  }}
+                >
+                  +
+                </div>
+
+                <h3
+                  style={{
+                    margin: "0 0 7px",
+                    color: "#172033",
+                    fontSize: "16px",
+                  }}
+                >
+                  No items added
+                </h3>
+
+                <p
+                  style={{
+                    margin: 0,
+                    maxWidth: "520px",
+                    color: "#667085",
+                    fontSize: "13px",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Click{" "}
+                  <strong>+ Add Item</strong>{" "}
+                  to add products to this invoice.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                padding: "0 24px",
+                overflowX: "auto",
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  minWidth: "1280px",
+                  borderCollapse: "collapse",
+                  fontSize: "13px",
+                }}
+              >
+                <thead>
+                  <tr
+                    style={{
+                      borderBottom:
+                        "1px solid #e4e8ef",
+                    }}
+                  >
+                    {[
+                      ["Product", "260px"],
+                      ["Warehouse", "180px"],
+                      ["Available", "100px"],
+                      ["Quantity", "110px"],
+                      ["Unit Price", "130px"],
+                      ["Discount", "120px"],
+                      ["Tax", "110px"],
+                      ["Total", "140px"],
+                      ["Action", "80px"],
+                    ].map(
+                      ([heading, width]) => (
+                        <th
+                          key={heading}
+                          style={{
+                            minWidth: width,
+                            padding: "13px 8px",
+                            textAlign: "left",
+                            color: "#667085",
+                            fontSize: "11px",
+                            fontWeight: 800,
+                            textTransform:
+                              "uppercase",
+                            letterSpacing:
+                              "0.05em",
+                          }}
+                        >
+                          {heading}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {lines.map((line) => {
+                    const available =
+                      getAvailableStock(
+                        line.productId,
+                        line.warehouseId
+                      );
+
+                    const lineTotal =
+                      getLineTotal(line);
+
+                    return (
+                      <tr
+                        key={line.id}
+                        style={{
+                          borderBottom:
+                            "1px solid #edf0f5",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          <select
+                            value={line.productId}
+                            onChange={(event) =>
+                              handleProductChange(
+                                line.id,
+                                event.target.value
+                              )
+                            }
+                            style={tableInputStyle}
+                          >
+                            <option value="">
+                              Select product
+                            </option>
+
+                            {products.map(
+                              (product) => (
+                                <option
+                                  key={product.id}
+                                  value={product.id}
+                                >
+                                  {product.name}
+                                  {product.sku
+                                    ? ` (${product.sku})`
+                                    : ""}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          <select
+                            value={
+                              line.warehouseId
+                            }
+                            onChange={(event) =>
+                              handleWarehouseChange(
+                                line.id,
+                                event.target.value
+                              )
+                            }
+                            style={tableInputStyle}
+                          >
+                            <option value="">
+                              Select warehouse
+                            </option>
+
+                            {warehouses.map(
+                              (warehouse) => (
+                                <option
+                                  key={warehouse.id}
+                                  value={warehouse.id}
+                                >
+                                  {warehouse.name}
+                                  {warehouse.code
+                                    ? ` (${warehouse.code})`
+                                    : ""}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            verticalAlign: "top",
+                            color:
+                              available > 0
+                                ? "#344054"
+                                : "#b42318",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {available}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={line.quantity}
+                            onChange={(event) =>
+                              updateLine(
+                                line.id,
+                                "quantity",
+                                numberValue(
+                                  event.target.value
+                                )
+                              )
+                            }
+                            style={tableInputStyle}
+                          />
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={line.unitPrice}
+                            onChange={(event) =>
+                              updateLine(
+                                line.id,
+                                "unitPrice",
+                                numberValue(
+                                  event.target.value
+                                )
+                              )
+                            }
+                            style={tableInputStyle}
+                          />
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={line.discount}
+                            onChange={(event) =>
+                              updateLine(
+                                line.id,
+                                "discount",
+                                numberValue(
+                                  event.target.value
+                                )
+                              )
+                            }
+                            style={tableInputStyle}
+                          />
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={line.tax}
+                            onChange={(event) =>
+                              updateLine(
+                                line.id,
+                                "tax",
+                                numberValue(
+                                  event.target.value
+                                )
+                              )
+                            }
+                            style={tableInputStyle}
+                          />
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            verticalAlign: "top",
+                            fontWeight: 800,
+                            color: "#172033",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {money(lineTotal)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeItem(line.id)
+                            }
+                            style={{
+                              border: "none",
+                              background: "#fff1f0",
+                              color: "#b42318",
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "7px",
+                              cursor: "pointer",
+                              fontWeight: 800,
+                            }}
+                            title="Remove item"
+                          >
+                            Ã—
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div
+              style={{
+                padding: "22px 24px 24px",
+                borderTop:
+                  "1px solid #edf0f5",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <div
+                style={{
+                  width: "360px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent:
+                      "space-between",
+                    padding: "7px 0",
+                    color: "#667085",
+                    fontSize: "13px",
+                  }}
+                >
+                  <span>Subtotal</span>
+
+                  <strong
+                    style={{
+                      color: "#172033",
+                    }}
+                  >
+                    {money(totals.subtotal)}
+                  </strong>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent:
+                      "space-between",
+                    padding: "7px 0",
+                    color: "#667085",
+                    fontSize: "13px",
+                  }}
+                >
+                  <span>Discount</span>
+
+                  <strong
+                    style={{
+                      color: "#172033",
+                    }}
+                  >
+                    {money(totals.discount)}
+                  </strong>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent:
+                      "space-between",
+                    padding: "7px 0",
+                    color: "#667085",
+                    fontSize: "13px",
+                  }}
+                >
+                  <span>Tax</span>
+
+                  <strong
+                    style={{
+                      color: "#172033",
+                    }}
+                  >
+                    {money(totals.tax)}
+                  </strong>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "10px",
+                    paddingTop: "13px",
+                    borderTop:
+                      "1px solid #dfe4ec",
+                    display: "flex",
+                    justifyContent:
+                      "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      color: "#172033",
+                      fontWeight: 800,
+                      fontSize: "15px",
+                    }}
+                  >
+                    Grand Total
+                  </span>
+
+                  <strong
+                    style={{
+                      color: "#7b61a8",
+                      fontSize: "20px",
+                    }}
+                  >
+                    {money(totals.total)}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+

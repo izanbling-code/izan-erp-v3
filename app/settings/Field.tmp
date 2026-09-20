@@ -1,0 +1,24 @@
+﻿function Field({
+  label,
+  description,
+  children,
+}: {
+  label: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={styles.field}>
+      <div style={styles.fieldInfo}>
+        <div style={styles.fieldLabel}>{label}</div>
+        {description && (
+          <div style={styles.fieldDescription}>{description}</div>
+        )}
+      </div>
+
+      <div style={styles.fieldControl}>
+        {children}
+      </div>
+    </div>
+  );
+}

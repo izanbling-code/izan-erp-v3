@@ -1,25 +1,36 @@
 {
-  "name": "izan-bling-v3",
+  "name": "izan-erp-v2",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync": "prisma db push"
   },
   "dependencies": {
-    "next": "16.3.5",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@vercel/analytics": "^2.0.1",
+    "jszip": "^3.10.1",
+    "lucide-react": "^1.47.0",
+    "next": "16.3.0",
+    "pg": "^8.23.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-hot-toast": "^2.6.0",
+    "recharts": "^3.10.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@prisma/client": "^7.10.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.5",
+    "eslint-config-next": "16.3.0",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

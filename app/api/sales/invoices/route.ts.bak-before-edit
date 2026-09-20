@@ -1,0 +1,917 @@
+﻿import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+import type { Prisma } from "@/app/generated/prisma/client";
+
+/*
+ * ============================================================
+ * SALES INVOICES API
+ * ============================================================
+ *
+ * GET  /api/sales/invoices
+ * POST /api/sales/invoices
+ *
+ * Batch-based inventory (mirrors /api/purchases/bills):
+ *
+ * Sales Invoice
+ *      Ã¢â€ â€œ (user picks an existing batch per line)
+ * Inventory Batch  -> cogsUnitCost snapshot
+ *      Ã¢â€ â€œ
+ * Stock Batch      -> decremented
+ *      Ã¢â€ â€œ
+ * Warehouse Stock  -> decremented
+ *      Ã¢â€ â€œ
+ * Inventory Movement (type SALE)
+ *
+ * A POSTED invoice ALSO creates a balanced Journal Entry:
+ *
+ *   Dr Accounts Receivable        total
+ *   Dr COGS (per line)            cogsTotal
+ *       Cr Inventory (per line)       cogsTotal
+ *       Cr Sales Revenue (per line)   qty*price - discount
+ *       Cr Tax Payable (if any)       totalTax
+ *
+ * DRAFT invoices do NOT touch stock or the ledger, same as
+ * DRAFT purchase bills.
+ */
+
+/* ============================================================
+   TYPES
+   ============================================================ */
+
+type SalesLineInput = {
+  productId: string;
+  batchId: string;
+  warehouseId: string;
+
+  quantity: number;
+  unitPrice: number;
+
+  discount?: number;
+  tax?: number;
+
+  description?: string | null;
+};
+
+type SalesInvoiceInput = {
+  customerId: string;
+  invoiceNo: string;
+
+  invoiceDate?: string;
+  dueDate?: string | null;
+
+  status?: "DRAFT" | "POSTED";
+
+  discount?: number;
+  tax?: number;
+
+  notes?: string | null;
+
+  lines: SalesLineInput[];
+};
+
+type AccountingSettings = {
+  arAccountId?: string;
+  taxPayableAccountId?: string;
+  defaultSalesAccountId?: string;
+  defaultCogsAccountId?: string;
+  defaultInventoryAccountId?: string;
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
+function decimalNumber(value: unknown): number {
+  const number = Number(value ?? 0);
+
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+
+  return number;
+}
+
+function cleanString(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const result = String(value).trim();
+
+  return result.length > 0 ? result : null;
+}
+
+function parseDate(value: unknown, fallback: Date = new Date()): Date {
+  if (!value) {
+    return fallback;
+  }
+
+  const date = new Date(String(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+
+  return date;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unexpected error.";
+}
+
+async function getCompany() {
+  return prisma.company.findFirst({
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+}
+
+/*
+ * Same numbering pattern as /api/accounting/journals
+ * (JE-000001, JE-000002, ...). Runs inside the transaction
+ * so two invoices posted at the same moment can't collide.
+ */
+async function nextEntryNumber(
+  tx: Prisma.TransactionClient,
+  companyId: string
+): Promise<string> {
+  const latest = await tx.journalEntry.findFirst({
+    where: {
+      companyId,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      entryNumber: true,
+    },
+  });
+
+  const match = latest?.entryNumber?.match(/(\d+)$/);
+
+  if (!match) return "JE-000001";
+
+  return `JE-${String(Number(match[1]) + 1).padStart(6, "0")}`;
+}
+
+/* ============================================================
+   GET
+   ============================================================ */
+
+export async function GET(request: NextRequest) {
+  try {
+    const company = await getCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+
+    const search = cleanString(searchParams.get("search"));
+    const status = cleanString(searchParams.get("status"));
+    const customerId = cleanString(searchParams.get("customerId"));
+
+    const invoices = await prisma.salesInvoice.findMany({
+      where: {
+        companyId: company.id,
+
+        ...(customerId ? { customerId } : {}),
+
+        ...(status &&
+        ["DRAFT", "POSTED", "PARTIAL", "PAID", "VOID"].includes(status)
+          ? {
+              status: status as
+                | "DRAFT"
+                | "POSTED"
+                | "PARTIAL"
+                | "PAID"
+                | "VOID",
+            }
+          : {}),
+
+        ...(search
+          ? {
+              OR: [
+                {
+                  invoiceNo: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  customer: {
+                    name: {
+                      contains: search,
+                      mode: "insensitive",
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+
+      include: {
+        customer: true,
+        lines: {
+          include: {
+            product: true,
+            batch: true,
+            warehouse: true,
+          },
+        },
+      },
+
+      orderBy: {
+        invoiceDate: "desc",
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      invoices,
+    });
+  } catch (error) {
+    console.error("GET /api/sales/invoices error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: errorMessage(error),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/* ============================================================
+   POST
+   ============================================================ */
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = (await request.json()) as SalesInvoiceInput;
+
+    /*
+     * --------------------------------------------------------
+     * BASIC VALIDATION
+     * --------------------------------------------------------
+     */
+
+    const customerId = cleanString(body.customerId);
+    const invoiceNo = cleanString(body.invoiceNo);
+
+    if (!customerId) {
+      return NextResponse.json(
+        { ok: false, error: "Customer is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!invoiceNo) {
+      return NextResponse.json(
+        { ok: false, error: "Invoice number is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(body.lines) || body.lines.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "At least one invoice item is required" },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * TEMPORARY SINGLE COMPANY CONTEXT
+     * --------------------------------------------------------
+     */
+
+    const company = await getCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        { ok: false, error: "No company has been configured" },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * CUSTOMER
+     * --------------------------------------------------------
+     */
+
+    const customer = await prisma.customer.findFirst({
+      where: {
+        id: customerId,
+        companyId: company.id,
+      },
+    });
+
+    if (!customer) {
+      return NextResponse.json(
+        { ok: false, error: "Customer not found" },
+        { status: 404 }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * INVOICE NUMBER MUST BE UNIQUE
+     * --------------------------------------------------------
+     */
+
+    const existingInvoice = await prisma.salesInvoice.findFirst({
+      where: {
+        companyId: company.id,
+        invoiceNo,
+      },
+    });
+
+    if (existingInvoice) {
+      return NextResponse.json(
+        { ok: false, error: `Invoice number ${invoiceNo} already exists` },
+        { status: 409 }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * NORMALIZE LINES
+     * --------------------------------------------------------
+     */
+
+    const lines = body.lines.map((line) => {
+      const quantity = decimalNumber(line.quantity);
+      const unitPrice = decimalNumber(line.unitPrice);
+      const discount = decimalNumber(line.discount);
+      const tax = decimalNumber(line.tax);
+
+      if (!line.productId) {
+        throw new Error("Every invoice line must have a product");
+      }
+
+      if (!line.batchId) {
+        throw new Error("Every invoice line must have a batch selected");
+      }
+
+      if (!line.warehouseId) {
+        throw new Error("Every invoice line must have a warehouse");
+      }
+
+      if (quantity <= 0) {
+        throw new Error("Invoice quantity must be greater than zero");
+      }
+
+      if (unitPrice < 0) {
+        throw new Error("Unit price cannot be negative");
+      }
+
+      if (discount < 0) {
+        throw new Error("Discount cannot be negative");
+      }
+
+      if (tax < 0) {
+        throw new Error("Tax cannot be negative");
+      }
+
+      return {
+        ...line,
+        quantity,
+        unitPrice,
+        discount,
+        tax,
+        total: quantity * unitPrice - discount + tax,
+      };
+    });
+
+    /*
+     * --------------------------------------------------------
+     * VALIDATE PRODUCTS, WAREHOUSES, BATCHES
+     * --------------------------------------------------------
+     */
+
+    const productIds = [...new Set(lines.map((line) => line.productId))];
+    const warehouseIds = [...new Set(lines.map((line) => line.warehouseId))];
+    const batchIds = [...new Set(lines.map((line) => line.batchId))];
+
+    const products = await prisma.product.findMany({
+      where: {
+        companyId: company.id,
+        id: { in: productIds },
+      },
+    });
+
+    const warehouses = await prisma.warehouse.findMany({
+      where: {
+        companyId: company.id,
+        id: { in: warehouseIds },
+      },
+    });
+
+    const batches = await prisma.inventoryBatch.findMany({
+      where: {
+        companyId: company.id,
+        id: { in: batchIds },
+      },
+    });
+
+    if (products.length !== productIds.length) {
+      return NextResponse.json(
+        { ok: false, error: "One or more selected products are invalid" },
+        { status: 400 }
+      );
+    }
+
+    if (warehouses.length !== warehouseIds.length) {
+      return NextResponse.json(
+        { ok: false, error: "One or more selected warehouses are invalid" },
+        { status: 400 }
+      );
+    }
+
+    if (batches.length !== batchIds.length) {
+      return NextResponse.json(
+        { ok: false, error: "One or more selected batches are invalid" },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * CALCULATE TOTALS (mirrors /api/purchases/bills)
+     * --------------------------------------------------------
+     */
+
+    const lineSubtotal = lines.reduce(
+      (sum, line) => sum + line.quantity * line.unitPrice,
+      0
+    );
+
+    const lineDiscount = lines.reduce((sum, line) => sum + line.discount, 0);
+    const lineTax = lines.reduce((sum, line) => sum + line.tax, 0);
+
+    const subtotal = lineSubtotal;
+
+    const invoiceDiscount = decimalNumber(body.discount);
+    const invoiceTax = decimalNumber(body.tax);
+
+    const totalDiscount = lineDiscount + invoiceDiscount;
+    const totalTax = lineTax + invoiceTax;
+
+    const total = subtotal - totalDiscount + totalTax;
+
+    /*
+     * --------------------------------------------------------
+     * STATUS
+     * --------------------------------------------------------
+     *
+     * Default is DRAFT.
+     * A draft does NOT affect stock or the ledger.
+     * A POSTED invoice DOES affect stock and the ledger.
+     */
+
+    const status = body.status === "POSTED" ? "POSTED" : "DRAFT";
+
+    /*
+     * --------------------------------------------------------
+     * RESOLVE GL ACCOUNTS (only required when posting)
+     * --------------------------------------------------------
+     *
+     * Every product can override its own sales / cogs /
+     * inventory account. If a product doesn't have one set,
+     * we fall back to the company-wide defaults stored in
+     * CompanySettings.accounting (configured once via
+     * PUT /api/settings with key "accounting").
+     */
+
+    let accounting: AccountingSettings = {};
+
+    if (status === "POSTED") {
+      const settings = await prisma.companySettings.findUnique({
+        where: { companyId: company.id },
+      });
+
+      accounting = (settings?.accounting as AccountingSettings) ?? {};
+
+      const missing: string[] = [];
+
+      if (!accounting.arAccountId) {
+        missing.push("Accounts Receivable account (accounting.arAccountId)");
+      }
+
+      if (totalTax > 0 && !accounting.taxPayableAccountId) {
+        missing.push(
+          "Tax Payable account (accounting.taxPayableAccountId) \u2014 required because this invoice has tax"
+        );
+      }
+
+      for (const line of lines) {
+        const product = products.find((p) => p.id === line.productId)!;
+
+        if (!product.salesAccountId) {
+          missing.push(`Sales Revenue account for product "${product.name}"`);
+        }
+        if (!product.cogsAccountId) {
+          missing.push(`COGS account for product "${product.name}"`);
+        }
+        if (!product.inventoryAccountId) {
+          missing.push(`Inventory account for product "${product.name}"`);
+        }
+      }
+
+      if (missing.length > 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "Cannot post invoice \u2014 missing GL account configuration: " +
+              [...new Set(missing)].join("; "),
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    /*
+     * --------------------------------------------------------
+     * TRANSACTION
+     * --------------------------------------------------------
+     */
+
+    const result = await prisma.$transaction(async (tx) => {
+      /*
+       * ------------------------------------------------------
+       * CREATE SALES INVOICE
+       * ------------------------------------------------------
+       */
+
+      const invoice = await tx.salesInvoice.create({
+        data: {
+          companyId: company.id,
+          customerId: customer.id,
+          invoiceNo,
+          invoiceDate: parseDate(body.invoiceDate),
+          dueDate: body.dueDate ? parseDate(body.dueDate) : null,
+
+          status,
+
+          subtotal,
+          discount: totalDiscount,
+          tax: totalTax,
+          total,
+
+          paid: 0,
+          balance: total,
+          cogs: 0,
+
+          notes: cleanString(body.notes),
+        },
+      });
+
+      /*
+       * ------------------------------------------------------
+       * PROCESS EACH INVOICE LINE
+       * ------------------------------------------------------
+       */
+
+      let totalCogs = 0;
+
+      const journalLines: {
+        accountId: string;
+        description: string;
+        debit: number;
+        credit: number;
+      }[] = [];
+
+      for (const line of lines) {
+        const product = products.find((item) => item.id === line.productId);
+
+        if (!product) {
+          throw new Error("Product not found");
+        }
+
+        /*
+         * --------------------------------------------------
+         * BATCH
+         * --------------------------------------------------
+         *
+         * Unlike purchases, sales NEVER create a batch.
+         * The batch must already exist and belong to this
+         * product. Its unitCost is snapshotted as the COGS
+         * for this line.
+         */
+
+        const batch = batches.find(
+          (item) => item.id === line.batchId && item.productId === product.id
+        );
+
+        if (!batch) {
+          throw new Error(
+            `Batch not found for product ${product.name}`
+          );
+        }
+
+        const cogsUnitCost = Number(batch.unitCost);
+        const cogsTotal = line.quantity * cogsUnitCost;
+
+        totalCogs += cogsTotal;
+
+        /*
+         * --------------------------------------------------
+         * SALES INVOICE LINE
+         * --------------------------------------------------
+         */
+
+        await tx.salesInvoiceLine.create({
+          data: {
+            invoiceId: invoice.id,
+            productId: product.id,
+            batchId: batch.id,
+
+            description: cleanString(line.description),
+
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            discount: line.discount,
+            tax: line.tax,
+            total: line.total,
+
+            warehouseId: line.warehouseId,
+
+            cogsUnitCost,
+            cogsTotal,
+          },
+        });
+
+        /*
+         * --------------------------------------------------
+         * ONLY POSTED INVOICES AFFECT INVENTORY
+         * --------------------------------------------------
+         */
+
+        if (status === "POSTED") {
+          /*
+           * ------------------------------------------------
+           * BATCH STOCK (must have enough in THIS warehouse)
+           * ------------------------------------------------
+           */
+
+          const stockBatch = await tx.stockBatch.findUnique({
+            where: {
+              batchId_warehouseId: {
+                batchId: batch.id,
+                warehouseId: line.warehouseId,
+              },
+            },
+          });
+
+          const availableInBatch = stockBatch
+            ? Number(stockBatch.quantity)
+            : 0;
+
+          if (!stockBatch || availableInBatch < line.quantity) {
+            const warehouse = warehouses.find(
+              (w) => w.id === line.warehouseId
+            );
+
+            throw new Error(
+              `Not enough stock in batch ${batch.batchNumber} at ${
+                warehouse?.name ?? "the selected warehouse"
+              } for ${product.name}. Available: ${availableInBatch}, requested: ${line.quantity}.`
+            );
+          }
+
+          await tx.stockBatch.update({
+            where: { id: stockBatch.id },
+            data: {
+              quantity: {
+                decrement: line.quantity,
+              },
+            },
+          });
+
+          /*
+           * ------------------------------------------------
+           * TOTAL PRODUCT STOCK
+           * ------------------------------------------------
+           *
+           * Only the quantity moves. averageCost is left
+           * untouched \u2014 selling units doesn't change the
+           * average cost of what remains.
+           */
+
+          const existingStock = await tx.stock.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: product.id,
+                warehouseId: line.warehouseId,
+              },
+            },
+          });
+
+          if (!existingStock || Number(existingStock.quantity) < line.quantity) {
+            throw new Error(
+              `Insufficient total stock for ${product.name} at the selected warehouse`
+            );
+          }
+
+          await tx.stock.update({
+            where: { id: existingStock.id },
+            data: {
+              quantity: {
+                decrement: line.quantity,
+              },
+            },
+          });
+
+          /*
+           * ------------------------------------------------
+           * INVENTORY MOVEMENT
+           * ------------------------------------------------
+           */
+
+          await tx.inventoryMovement.create({
+            data: {
+              companyId: company.id,
+              productId: product.id,
+              batchId: batch.id,
+
+              sourceWarehouseId: line.warehouseId,
+
+              type: "SALE",
+              referenceType: "SALE",
+              referenceId: invoice.id,
+
+              quantity: line.quantity,
+              unitCost: cogsUnitCost,
+              totalCost: cogsTotal,
+
+              movementDate: invoice.invoiceDate,
+
+              notes: `Sales Invoice ${invoice.invoiceNo}`,
+            },
+          });
+
+          /*
+           * ------------------------------------------------
+           * JOURNAL LINE CONTRIBUTIONS FOR THIS LINE
+           * ------------------------------------------------
+           */
+
+          const salesAccountId =
+            product.salesAccountId ?? accounting.defaultSalesAccountId!;
+          const cogsAccountId =
+            product.cogsAccountId ?? accounting.defaultCogsAccountId!;
+          const inventoryAccountId =
+            product.inventoryAccountId ??
+            accounting.defaultInventoryAccountId!;
+
+          const netRevenue = line.quantity * line.unitPrice - line.discount;
+
+          journalLines.push({
+            accountId: cogsAccountId,
+            description: `COGS \u2014 ${product.name} (${invoice.invoiceNo})`,
+            debit: cogsTotal,
+            credit: 0,
+          });
+
+          journalLines.push({
+            accountId: inventoryAccountId,
+            description: `Inventory \u2014 ${product.name} (${invoice.invoiceNo})`,
+            debit: 0,
+            credit: cogsTotal,
+          });
+
+          journalLines.push({
+            accountId: salesAccountId,
+            description: `Sales \u2014 ${product.name} (${invoice.invoiceNo})`,
+            debit: 0,
+            credit: netRevenue,
+          });
+        }
+      }
+
+      /*
+       * ------------------------------------------------------
+       * JOURNAL ENTRY (only for POSTED invoices)
+       * ------------------------------------------------------
+       */
+
+      let journalId: string | null = null;
+
+      if (status === "POSTED") {
+        journalLines.push({
+          accountId: accounting.arAccountId!,
+          description: `Accounts Receivable \u2014 Invoice ${invoice.invoiceNo}`,
+          debit: total,
+          credit: 0,
+        });
+
+        if (totalTax > 0) {
+          journalLines.push({
+            accountId: accounting.taxPayableAccountId!,
+            description: `Sales Tax \u2014 Invoice ${invoice.invoiceNo}`,
+            debit: 0,
+            credit: totalTax,
+          });
+        }
+
+        const totalDebit = journalLines.reduce((s, l) => s + l.debit, 0);
+        const totalCredit = journalLines.reduce((s, l) => s + l.credit, 0);
+
+        if (Math.abs(totalDebit - totalCredit) > 0.01) {
+          throw new Error(
+            `Journal entry is not balanced. Debit: ${totalDebit.toFixed(
+              2
+            )}, Credit: ${totalCredit.toFixed(2)}. This should never happen \u2014 please report it.`
+          );
+        }
+
+        const entryNumber = await nextEntryNumber(tx, company.id);
+
+        const journalEntry = await tx.journalEntry.create({
+          data: {
+            companyId: company.id,
+            entryNumber,
+            entryDate: invoice.invoiceDate,
+            reference: invoice.invoiceNo,
+            description: `Sales Invoice ${invoice.invoiceNo}`,
+            status: "POSTED",
+            referenceType: "SALE",
+            lines: {
+              create: journalLines.map((line) => ({
+                accountId: line.accountId,
+                description: line.description,
+                debit: line.debit,
+                credit: line.credit,
+              })),
+            },
+          },
+        });
+
+        journalId = journalEntry.id;
+      }
+
+      /*
+       * ------------------------------------------------------
+       * UPDATE INVOICE WITH COGS + JOURNAL LINK
+       * ------------------------------------------------------
+       */
+
+      await tx.salesInvoice.update({
+        where: { id: invoice.id },
+        data: {
+          cogs: totalCogs,
+          journalId,
+        },
+      });
+
+      /*
+       * ------------------------------------------------------
+       * RETURN COMPLETE INVOICE
+       * ------------------------------------------------------
+       */
+
+      return tx.salesInvoice.findUnique({
+        where: { id: invoice.id },
+        include: {
+          customer: true,
+          lines: {
+            include: {
+              product: true,
+              batch: true,
+              warehouse: true,
+            },
+          },
+          journal: {
+            include: {
+              lines: {
+                include: { account: true },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    return NextResponse.json({ ok: true, invoice: result }, { status: 201 });
+  } catch (error) {
+    console.error("POST /api/sales/invoices error:", error);
+
+    return NextResponse.json(
+      { ok: false, error: errorMessage(error) },
+      { status: 500 }
+    );
+  }
+}

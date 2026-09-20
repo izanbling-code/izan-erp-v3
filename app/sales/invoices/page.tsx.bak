@@ -1,0 +1,2739 @@
+﻿"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+
+type InvoiceLine = {
+  id?: string;
+  productId: string;
+  batchId: string;
+  warehouseId: string;
+  quantity: number | string;
+  unitPrice: number | string;
+  discount: number | string;
+  tax: number | string;
+  total: number | string;
+  description?: string | null;
+  cogsUnitCost?: number | string;
+  cogsTotal?: number | string;
+  product?: {
+    id: string;
+    name: string;
+    sku?: string | null;
+  } | null;
+  batch?: {
+    id: string;
+    batchNumber: string;
+    unitCost?: number | string;
+  } | null;
+  warehouse?: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+type Invoice = {
+  id: string;
+  invoiceNo: string;
+  invoiceDate: string;
+  dueDate?: string | null;
+  status: "DRAFT" | "POSTED" | "PARTIAL" | "PAID" | "VOID";
+  subtotal: number | string;
+  discount: number | string;
+  tax: number | string;
+  total: number | string;
+  paid: number | string;
+  balance: number | string;
+  cogs?: number | string;
+  notes?: string | null;
+  journalId?: string | null;
+  customer?: {
+    id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+  lines?: InvoiceLine[];
+};
+
+type EditLine = {
+  productId: string;
+  batchId: string;
+  warehouseId: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  tax: number;
+  description: string;
+};
+
+function money(value: number | string) {
+  const number = Number(value ?? 0);
+  return `₨ ${(Number.isFinite(number) ? number : 0).toFixed(2)}`;
+}
+
+function numberValue(value: number | string | undefined | null) {
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString();
+}
+
+function inputDate(value?: string | null) {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toISOString().slice(0, 10);
+}
+
+const STATUS_COLORS: Record<
+  Invoice["status"],
+  { bg: string; color: string }
+> = {
+  DRAFT: { bg: "#f2f4f7", color: "#475467" },
+  POSTED: { bg: "#eaf6ee", color: "#1e7b45" },
+  PARTIAL: { bg: "#fff6e5", color: "#a15c00" },
+  PAID: { bg: "#eaf2ff", color: "#1849a9" },
+  VOID: { bg: "#fff1f0", color: "#b42318" },
+};
+
+export default function SalesInvoicesPage() {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+
+  const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+  const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
+
+  const [editInvoiceNo, setEditInvoiceNo] = useState("");
+  const [editInvoiceDate, setEditInvoiceDate] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editDiscount, setEditDiscount] = useState(0);
+  const [editTax, setEditTax] = useState(0);
+  const [editNotes, setEditNotes] = useState("");
+  const [editLines, setEditLines] = useState<EditLine[]>([]);
+
+  const [saving, setSaving] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [modalError, setModalError] = useState("");
+
+  async function loadInvoices() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const params = new URLSearchParams();
+
+      if (search.trim()) {
+        params.set("search", search.trim());
+      }
+
+      if (status) {
+        params.set("status", status);
+      }
+
+      const response = await fetch(
+        `/api/sales/invoices?${params.toString()}`
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(
+          data.error || "Failed to load invoices"
+        );
+      }
+
+      setInvoices(
+        Array.isArray(data.invoices)
+          ? data.invoices
+          : []
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load invoices"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const timeout = setTimeout(loadInvoices, 250);
+
+    return () => clearTimeout(timeout);
+  }, [search, status]);
+
+  function openView(invoice: Invoice) {
+    setViewInvoice(invoice);
+    setModalError("");
+  }
+
+  function openEdit(invoice: Invoice) {
+    if (invoice.status !== "DRAFT") {
+      setError(
+        "Only draft invoices can be edited."
+      );
+      return;
+    }
+
+    setEditInvoice(invoice);
+    setEditInvoiceNo(invoice.invoiceNo);
+    setEditInvoiceDate(
+      inputDate(invoice.invoiceDate)
+    );
+    setEditDueDate(
+      inputDate(invoice.dueDate)
+    );
+    setEditDiscount(
+      numberValue(invoice.discount)
+    );
+    setEditTax(
+      numberValue(invoice.tax)
+    );
+    setEditNotes(invoice.notes ?? "");
+
+    setEditLines(
+      (invoice.lines ?? []).map((line) => ({
+        productId: line.productId,
+        batchId: line.batchId,
+        warehouseId: line.warehouseId,
+        quantity: numberValue(line.quantity),
+        unitPrice: numberValue(line.unitPrice),
+        discount: numberValue(line.discount),
+        tax: numberValue(line.tax),
+        description: line.description ?? "",
+      }))
+    );
+
+    setModalError("");
+  }
+
+  function updateEditLine(
+    index: number,
+    field: keyof EditLine,
+    value: string
+  ) {
+    setEditLines((current) =>
+      current.map((line, lineIndex) => {
+        if (lineIndex !== index) {
+          return line;
+        }
+
+        if (
+          field === "quantity" ||
+          field === "unitPrice" ||
+          field === "discount" ||
+          field === "tax"
+        ) {
+          return {
+            ...line,
+            [field]: Number(value) || 0,
+          };
+        }
+
+        return {
+          ...line,
+          [field]: value,
+        };
+      })
+    );
+  }
+
+  function editSubtotal() {
+    return editLines.reduce(
+      (sum, line) =>
+        sum +
+        line.quantity * line.unitPrice,
+      0
+    );
+  }
+
+  function editTotal() {
+    const subtotal = editSubtotal();
+
+    const lineDiscount = editLines.reduce(
+      (sum, line) => sum + line.discount,
+      0
+    );
+
+    const lineTax = editLines.reduce(
+      (sum, line) => sum + line.tax,
+      0
+    );
+
+    return (
+      subtotal -
+      lineDiscount -
+      0 +
+      Number(editDiscount || 0) * -1 +
+      lineTax +
+      Number(editTax || 0)
+    );
+  }
+
+  async function saveInvoice(postAfterSave = false) {
+    if (!editInvoice) return;
+
+    try {
+      if (!editInvoiceNo.trim()) {
+        setModalError(
+          "Invoice number is required."
+        );
+        return;
+      }
+
+      if (!editLines.length) {
+        setModalError(
+          "At least one invoice item is required."
+        );
+        return;
+      }
+
+      setModalError("");
+
+      if (postAfterSave) {
+        setPosting(true);
+      } else {
+        setSaving(true);
+      }
+
+      const response = await fetch(
+        "/api/sales/invoices",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: editInvoice.id,
+            customerId:
+              editInvoice.customer?.id ?? "",
+            invoiceNo: editInvoiceNo.trim(),
+            invoiceDate:
+              editInvoiceDate || undefined,
+            dueDate:
+              editDueDate || null,
+            discount:
+              Number(editDiscount) || 0,
+            tax:
+              Number(editTax) || 0,
+            notes:
+              editNotes.trim() || null,
+            lines: editLines.map((line) => ({
+              productId: line.productId,
+              batchId: line.batchId,
+              warehouseId: line.warehouseId,
+              quantity:
+                Number(line.quantity) || 0,
+              unitPrice:
+                Number(line.unitPrice) || 0,
+              discount:
+                Number(line.discount) || 0,
+              tax:
+                Number(line.tax) || 0,
+              description:
+                line.description.trim() || null,
+            })),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(
+          data.error ||
+            "Failed to save invoice"
+        );
+      }
+
+      let finalInvoice = data.invoice;
+
+      if (postAfterSave) {
+        const postResponse = await fetch(
+          "/api/sales/invoices",
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              id: editInvoice.id,
+              action: "POST",
+            }),
+          }
+        );
+
+        const postData =
+          await postResponse.json();
+
+        if (
+          !postResponse.ok ||
+          !postData.ok
+        ) {
+          throw new Error(
+            postData.error ||
+              "Invoice was saved but could not be posted."
+          );
+        }
+
+        finalInvoice =
+          postData.invoice;
+      }
+
+      setEditInvoice(null);
+      setViewInvoice(null);
+
+      await loadInvoices();
+
+      if (finalInvoice) {
+        setViewInvoice(finalInvoice);
+      }
+    } catch (err) {
+      console.error(err);
+
+      setModalError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong."
+      );
+    } finally {
+      setSaving(false);
+      setPosting(false);
+    }
+  }
+
+  async function postInvoice(invoice: Invoice) {
+    if (invoice.status !== "DRAFT") {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Post invoice ${invoice.invoiceNo}?\n\nPosting will reduce inventory and create the accounting journal entry.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setModalError("");
+      setPosting(true);
+
+      const response = await fetch(
+        "/api/sales/invoices",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: invoice.id,
+            action: "POST",
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(
+          data.error ||
+            "Failed to post invoice"
+        );
+      }
+
+      setViewInvoice(data.invoice);
+      await loadInvoices();
+    } catch (err) {
+      console.error(err);
+
+      setModalError(
+        err instanceof Error
+          ? err.message
+          : "Failed to post invoice"
+      );
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  return (
+    <>
+      <div
+        className="dashboard"
+        style={{
+          maxWidth: "1380px",
+          margin: "0 auto",
+          paddingBottom: "40px",
+        }}
+      >
+        <div
+          className="dashboard-heading"
+          style={{
+            marginBottom: "24px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "16px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <p
+              className="eyebrow"
+              style={{
+                color: "#6b7280",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+              }}
+            >
+              SALES / INVOICES
+            </p>
+
+            <h1>Sales Invoices</h1>
+
+            <p className="dashboard-description">
+              View, search, edit, post, and create
+              customer sales invoices.
+            </p>
+          </div>
+
+          <Link
+            href="/sales/invoices/new"
+            style={{
+              border: "none",
+              background: "#7b61a8",
+              color: "#ffffff",
+              padding: "10px 16px",
+              borderRadius: "8px",
+              fontWeight: 700,
+              fontSize: "14px",
+              textDecoration: "none",
+              boxShadow:
+                "0 3px 8px rgba(123, 97, 168, 0.22)",
+            }}
+          >
+            + New Invoice
+          </Link>
+        </div>
+
+        {error && (
+          <div
+            style={{
+              marginBottom: "18px",
+              padding: "12px 15px",
+              borderRadius: "8px",
+              border:
+                "1px solid #f1c0c0",
+              background: "#fff7f7",
+              color: "#b42318",
+              fontSize: "13px",
+              fontWeight: 600,
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <section
+          style={{
+            background: "#ffffff",
+            border:
+              "1px solid #e4e8ef",
+            borderRadius: "14px",
+            boxShadow:
+              "0 2px 8px rgba(15, 23, 42, 0.04)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: "16px 24px",
+              borderBottom:
+                "1px solid #edf0f5",
+              background: "#fbfcfe",
+              display: "flex",
+              gap: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            <input
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              type="text"
+              placeholder="Search invoice number or customer..."
+              style={{
+                flex: "1 1 260px",
+                padding: "9px 12px",
+                border:
+                  "1px solid #d8dee8",
+                borderRadius: "8px",
+                fontSize: "13px",
+                outline: "none",
+              }}
+            />
+
+            <select
+              value={status}
+              onChange={(e) =>
+                setStatus(e.target.value)
+              }
+              style={{
+                padding: "9px 12px",
+                border:
+                  "1px solid #d8dee8",
+                borderRadius: "8px",
+                fontSize: "13px",
+                background: "#ffffff",
+              }}
+            >
+              <option value="">
+                All statuses
+              </option>
+              <option value="DRAFT">
+                Draft
+              </option>
+              <option value="POSTED">
+                Posted
+              </option>
+              <option value="PARTIAL">
+                Partial
+              </option>
+              <option value="PAID">
+                Paid
+              </option>
+              <option value="VOID">
+                Void
+              </option>
+            </select>
+          </div>
+
+          {loading ? (
+            <div
+              style={{
+                padding: "40px 24px",
+                textAlign: "center",
+                color: "#667085",
+                fontSize: "13px",
+              }}
+            >
+              Loading invoices...
+            </div>
+          ) : invoices.length === 0 ? (
+            <div
+              style={{
+                padding:
+                  "20px 24px 24px",
+              }}
+            >
+              <div
+                style={{
+                  minHeight: "180px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent:
+                    "center",
+                  textAlign: "center",
+                  border:
+                    "1px dashed #d8dee8",
+                  borderRadius: "12px",
+                  background: "#fbfcfe",
+                  padding: "30px",
+                }}
+              >
+                <div>
+                  <h3
+                    style={{
+                      margin:
+                        "0 0 7px",
+                      color: "#172033",
+                      fontSize: "16px",
+                    }}
+                  >
+                    No invoices yet
+                  </h3>
+
+                  <p
+                    style={{
+                      margin: 0,
+                      color: "#667085",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Click{" "}
+                    <strong>
+                      + New Invoice
+                    </strong>{" "}
+                    above to create your
+                    first sales invoice.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                padding:
+                  "0 24px 8px",
+                overflowX: "auto",
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  minWidth: "980px",
+                  borderCollapse:
+                    "collapse",
+                  fontSize: "13px",
+                }}
+              >
+                <thead>
+                  <tr
+                    style={{
+                      borderBottom:
+                        "1px solid #e4e8ef",
+                    }}
+                  >
+                    {[
+                      "Invoice #",
+                      "Customer",
+                      "Date",
+                      "Status",
+                      "Total",
+                      "Balance",
+                      "Actions",
+                    ].map((heading) => (
+                      <th
+                        key={heading}
+                        style={{
+                          padding:
+                            "13px 8px",
+                          textAlign:
+                            heading ===
+                            "Actions"
+                              ? "right"
+                              : "left",
+                          color: "#667085",
+                          fontSize: "11px",
+                          fontWeight: 800,
+                          textTransform:
+                            "uppercase",
+                          letterSpacing:
+                            "0.05em",
+                        }}
+                      >
+                        {heading}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {invoices.map(
+                    (invoice) => {
+                      const colors =
+                        STATUS_COLORS[
+                          invoice.status
+                        ] ??
+                        STATUS_COLORS.DRAFT;
+
+                      return (
+                        <tr
+                          key={
+                            invoice.id
+                          }
+                          style={{
+                            borderBottom:
+                              "1px solid #edf0f5",
+                          }}
+                        >
+                          <td
+                            style={{
+                              padding:
+                                "12px 8px",
+                              fontWeight: 700,
+                              color:
+                                "#172033",
+                            }}
+                          >
+                            {
+                              invoice.invoiceNo
+                            }
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "12px 8px",
+                              color:
+                                "#344054",
+                            }}
+                          >
+                            {invoice
+                              .customer
+                              ?.name ??
+                              "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "12px 8px",
+                              color:
+                                "#667085",
+                            }}
+                          >
+                            {formatDate(
+                              invoice.invoiceDate
+                            )}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "12px 8px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                background:
+                                  colors.bg,
+                                color:
+                                  colors.color,
+                                padding:
+                                  "4px 10px",
+                                borderRadius:
+                                  "999px",
+                                fontSize:
+                                  "11px",
+                                fontWeight: 800,
+                                textTransform:
+                                  "uppercase",
+                                letterSpacing:
+                                  "0.04em",
+                              }}
+                            >
+                              {
+                                invoice.status
+                              }
+                            </span>
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "12px 8px",
+                              fontWeight: 700,
+                              color:
+                                "#172033",
+                            }}
+                          >
+                            {money(
+                              invoice.total
+                            )}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "12px 8px",
+                              color:
+                                Number(
+                                  invoice.balance
+                                ) > 0
+                                  ? "#b42318"
+                                  : "#667085",
+                            }}
+                          >
+                            {money(
+                              invoice.balance
+                            )}
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "10px 8px",
+                              textAlign:
+                                "right",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display:
+                                  "flex",
+                                justifyContent:
+                                  "flex-end",
+                                gap: "7px",
+                                flexWrap:
+                                  "wrap",
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openView(
+                                    invoice
+                                  )
+                                }
+                                style={{
+                                  border:
+                                    "1px solid #d0d5dd",
+                                  background:
+                                    "#ffffff",
+                                  color:
+                                    "#344054",
+                                  padding:
+                                    "7px 11px",
+                                  borderRadius:
+                                    "7px",
+                                  fontSize:
+                                    "12px",
+                                  fontWeight: 700,
+                                  cursor:
+                                    "pointer",
+                                }}
+                              >
+                                View
+                              </button>
+
+                              {invoice.status ===
+                                "DRAFT" && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openEdit(
+                                        invoice
+                                      )
+                                    }
+                                    style={{
+                                      border:
+                                        "1px solid #c7b8df",
+                                      background:
+                                        "#f7f3fb",
+                                      color:
+                                        "#684f8d",
+                                      padding:
+                                        "7px 11px",
+                                      borderRadius:
+                                        "7px",
+                                      fontSize:
+                                        "12px",
+                                      fontWeight: 700,
+                                      cursor:
+                                        "pointer",
+                                    }}
+                                  >
+                                    Edit
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      postInvoice(
+                                        invoice
+                                      )
+                                    }
+                                    disabled={
+                                      posting
+                                    }
+                                    style={{
+                                      border:
+                                        "none",
+                                      background:
+                                        "#16a34a",
+                                      color:
+                                        "#ffffff",
+                                      padding:
+                                        "7px 11px",
+                                      borderRadius:
+                                        "7px",
+                                      fontSize:
+                                        "12px",
+                                      fontWeight: 700,
+                                      cursor:
+                                        posting
+                                          ? "not-allowed"
+                                          : "pointer",
+                                      opacity:
+                                        posting
+                                          ? 0.6
+                                          : 1,
+                                    }}
+                                  >
+                                    Post
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {viewInvoice && (
+        <div
+          onMouseDown={(e) => {
+            if (
+              e.target ===
+              e.currentTarget
+            ) {
+              setViewInvoice(null);
+              setModalError("");
+            }
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background:
+              "rgba(15, 23, 42, 0.48)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent:
+              "center",
+            padding: "24px",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              width: "min(1000px, 100%)",
+              maxHeight:
+                "calc(100vh - 48px)",
+              overflowY: "auto",
+              background: "#ffffff",
+              borderRadius: "16px",
+              boxShadow:
+                "0 20px 60px rgba(15, 23, 42, 0.22)",
+            }}
+          >
+            <div
+              style={{
+                padding:
+                  "20px 24px",
+                borderBottom:
+                  "1px solid #edf0f5",
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems:
+                  "center",
+                gap: "15px",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    color: "#7b61a8",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    letterSpacing:
+                      "0.08em",
+                    marginBottom:
+                      "4px",
+                  }}
+                >
+                  SALES INVOICE
+                </div>
+
+                <h2
+                  style={{
+                    margin: 0,
+                    color: "#172033",
+                    fontSize: "22px",
+                  }}
+                >
+                  {
+                    viewInvoice.invoiceNo
+                  }
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setViewInvoice(
+                    null
+                  );
+                  setModalError("");
+                }}
+                style={{
+                  border:
+                    "1px solid #d0d5dd",
+                  background:
+                    "#ffffff",
+                  color:
+                    "#344054",
+                  width: "34px",
+                  height: "34px",
+                  borderRadius:
+                    "8px",
+                  fontSize:
+                    "20px",
+                  cursor:
+                    "pointer",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {modalError && (
+              <div
+                style={{
+                  margin:
+                    "18px 24px 0",
+                  padding:
+                    "11px 14px",
+                  borderRadius:
+                    "8px",
+                  border:
+                    "1px solid #f1c0c0",
+                  background:
+                    "#fff7f7",
+                  color:
+                    "#b42318",
+                  fontSize:
+                    "13px",
+                  fontWeight: 600,
+                }}
+              >
+                {modalError}
+              </div>
+            )}
+
+            <div
+              style={{
+                padding:
+                  "22px 24px 24px",
+              }}
+            >
+              <div
+                style={{
+                  display:
+                    "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(190px, 1fr))",
+                  gap: "14px",
+                  marginBottom:
+                    "22px",
+                }}
+              >
+                {[
+                  [
+                    "Customer",
+                    viewInvoice.customer
+                      ?.name ?? "—",
+                  ],
+                  [
+                    "Invoice Date",
+                    formatDate(
+                      viewInvoice.invoiceDate
+                    ),
+                  ],
+                  [
+                    "Due Date",
+                    formatDate(
+                      viewInvoice.dueDate
+                    ),
+                  ],
+                  [
+                    "Status",
+                    viewInvoice.status,
+                  ],
+                ].map(
+                  ([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        border:
+                          "1px solid #e4e8ef",
+                        borderRadius:
+                          "10px",
+                        padding:
+                          "13px 14px",
+                        background:
+                          "#fbfcfe",
+                      }}
+                    >
+                      <div
+                        style={{
+                          color:
+                            "#667085",
+                          fontSize:
+                            "11px",
+                          fontWeight: 700,
+                          textTransform:
+                            "uppercase",
+                          marginBottom:
+                            "5px",
+                        }}
+                      >
+                        {label}
+                      </div>
+
+                      <div
+                        style={{
+                          color:
+                            "#172033",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {value}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+
+              <div
+                style={{
+                  border:
+                    "1px solid #e4e8ef",
+                  borderRadius:
+                    "12px",
+                  overflow:
+                    "hidden",
+                  marginBottom:
+                    "20px",
+                }}
+              >
+                <div
+                  style={{
+                    padding:
+                      "13px 16px",
+                    background:
+                      "#f8fafc",
+                    borderBottom:
+                      "1px solid #e4e8ef",
+                    fontWeight: 800,
+                    color:
+                      "#172033",
+                  }}
+                >
+                  Invoice Items
+                </div>
+
+                <div
+                  style={{
+                    overflowX:
+                      "auto",
+                  }}
+                >
+                  <table
+                    style={{
+                      width:
+                        "100%",
+                      minWidth:
+                        "700px",
+                      borderCollapse:
+                        "collapse",
+                      fontSize:
+                        "12px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          borderBottom:
+                            "1px solid #edf0f5",
+                        }}
+                      >
+                        {[
+                          "Product",
+                          "Batch",
+                          "Warehouse",
+                          "Qty",
+                          "Unit Price",
+                          "Discount",
+                          "Tax",
+                          "Total",
+                        ].map(
+                          (heading) => (
+                            <th
+                              key={
+                                heading
+                              }
+                              style={{
+                                padding:
+                                  "10px 9px",
+                                textAlign:
+                                  "left",
+                                color:
+                                  "#667085",
+                                fontSize:
+                                  "10px",
+                                textTransform:
+                                  "uppercase",
+                              }}
+                            >
+                              {
+                                heading
+                              }
+                            </th>
+                          )
+                        )}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {(
+                        viewInvoice.lines ??
+                        []
+                      ).map(
+                        (
+                          line,
+                          index
+                        ) => (
+                          <tr
+                            key={
+                              line.id ??
+                              index
+                            }
+                            style={{
+                              borderBottom:
+                                "1px solid #edf0f5",
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding:
+                                  "11px 9px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {
+                                line
+                                  .product
+                                  ?.name ??
+                                "—"
+                              }
+                            </td>
+
+                            <td
+                              style={{
+                                padding:
+                                  "11px 9px",
+                              }}
+                            >
+                              {
+                                line
+                                  .batch
+                                  ?.batchNumber ??
+                                "—"
+                              }
+                            </td>
+
+                            <td
+                              style={{
+                                padding:
+                                  "11px 9px",
+                              }}
+                            >
+                              {
+                                line
+                                  .warehouse
+                                  ?.name ??
+                                "—"
+                              }
+                            </td>
+
+                            <td
+                              style={{
+                                padding:
+                                  "11px 9px",
+                              }}
+                            >
+                              {
+                                line.quantity
+                              }
+                            </td>
+
+                            <td
+                              style={{
+                                padding:
+                                  "11px 9px",
+                              }}
+                            >
+                              {money(
+                                line.unitPrice
+                              )}
+                            </td>
+
+                            <td
+                              style={{
+                                padding:
+                                  "11px 9px",
+                              }}
+                            >
+                              {money(
+                                line.discount
+                              )}
+                            </td>
+
+                            <td
+                              style={{
+                                padding:
+                                  "11px 9px",
+                              }}
+                            >
+                              {money(
+                                line.tax
+                              )}
+                            </td>
+
+                            <td
+                              style={{
+                                padding:
+                                  "11px 9px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {money(
+                                line.total
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display:
+                    "flex",
+                  justifyContent:
+                    "flex-end",
+                }}
+              >
+                <div
+                  style={{
+                    width:
+                      "320px",
+                  }}
+                >
+                  {[
+                    [
+                      "Subtotal",
+                      money(
+                        viewInvoice.subtotal
+                      ),
+                    ],
+                    [
+                      "Discount",
+                      money(
+                        viewInvoice.discount
+                      ),
+                    ],
+                    [
+                      "Tax",
+                      money(
+                        viewInvoice.tax
+                      ),
+                    ],
+                    [
+                      "Total",
+                      money(
+                        viewInvoice.total
+                      ),
+                    ],
+                    [
+                      "Paid",
+                      money(
+                        viewInvoice.paid
+                      ),
+                    ],
+                    [
+                      "Balance",
+                      money(
+                        viewInvoice.balance
+                      ),
+                    ],
+                  ].map(
+                    ([label, value]) => (
+                      <div
+                        key={label}
+                        style={{
+                          display:
+                            "flex",
+                          justifyContent:
+                            "space-between",
+                          padding:
+                            "6px 0",
+                          borderBottom:
+                            label ===
+                            "Total"
+                              ? "1px solid #d8dee8"
+                              : "none",
+                          fontWeight:
+                            label ===
+                            "Total"
+                              ? 800
+                              : 500,
+                          color:
+                            label ===
+                            "Balance"
+                              ? Number(
+                                  viewInvoice.balance
+                                ) > 0
+                                ? "#b42318"
+                                : "#344054"
+                              : "#344054",
+                        }}
+                      >
+                        <span>
+                          {label}
+                        </span>
+
+                        <span>
+                          {value}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+
+              {viewInvoice.notes && (
+                <div
+                  style={{
+                    marginTop:
+                      "20px",
+                    padding:
+                      "13px 15px",
+                    borderRadius:
+                      "9px",
+                    background:
+                      "#f8fafc",
+                    border:
+                      "1px solid #e4e8ef",
+                    color:
+                      "#475467",
+                    fontSize:
+                      "13px",
+                  }}
+                >
+                  <strong>
+                    Notes:
+                  </strong>{" "}
+                  {viewInvoice.notes}
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                padding:
+                  "16px 24px",
+                borderTop:
+                  "1px solid #edf0f5",
+                display:
+                  "flex",
+                justifyContent:
+                  "flex-end",
+                gap: "9px",
+                flexWrap:
+                  "wrap",
+              }}
+            >
+              {viewInvoice.status ===
+                "DRAFT" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const invoice =
+                        viewInvoice;
+
+                      setViewInvoice(
+                        null
+                      );
+
+                      openEdit(
+                        invoice
+                      );
+                    }}
+                    style={{
+                      border:
+                        "1px solid #c7b8df",
+                      background:
+                        "#f7f3fb",
+                      color:
+                        "#684f8d",
+                      padding:
+                        "9px 15px",
+                      borderRadius:
+                        "8px",
+                      fontWeight: 700,
+                      cursor:
+                        "pointer",
+                    }}
+                  >
+                    Edit Invoice
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      postInvoice(
+                        viewInvoice
+                      )
+                    }
+                    disabled={
+                      posting
+                    }
+                    style={{
+                      border:
+                        "none",
+                      background:
+                        "#16a34a",
+                      color:
+                        "#ffffff",
+                      padding:
+                        "9px 17px",
+                      borderRadius:
+                        "8px",
+                      fontWeight: 700,
+                      cursor:
+                        posting
+                          ? "not-allowed"
+                          : "pointer",
+                      opacity:
+                        posting
+                          ? 0.6
+                          : 1,
+                    }}
+                  >
+                    {posting
+                      ? "Posting..."
+                      : "Post Invoice"}
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setViewInvoice(
+                    null
+                  );
+                  setModalError("");
+                }}
+                style={{
+                  border:
+                    "1px solid #d0d5dd",
+                  background:
+                    "#ffffff",
+                  color:
+                    "#344054",
+                  padding:
+                    "9px 15px",
+                  borderRadius:
+                    "8px",
+                  fontWeight: 700,
+                  cursor:
+                    "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editInvoice && (
+        <div
+          onMouseDown={(e) => {
+            if (
+              e.target ===
+              e.currentTarget &&
+              !saving &&
+              !posting
+            ) {
+              setEditInvoice(
+                null
+              );
+              setModalError("");
+            }
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background:
+              "rgba(15, 23, 42, 0.48)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent:
+              "center",
+            padding: "24px",
+            zIndex: 1001,
+          }}
+        >
+          <div
+            style={{
+              width: "min(1100px, 100%)",
+              maxHeight:
+                "calc(100vh - 48px)",
+              overflowY: "auto",
+              background: "#ffffff",
+              borderRadius: "16px",
+              boxShadow:
+                "0 20px 60px rgba(15, 23, 42, 0.22)",
+            }}
+          >
+            <div
+              style={{
+                padding:
+                  "20px 24px",
+                borderBottom:
+                  "1px solid #edf0f5",
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems:
+                  "center",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    color:
+                      "#7b61a8",
+                    fontSize:
+                      "11px",
+                    fontWeight:
+                      800,
+                    letterSpacing:
+                      "0.08em",
+                    marginBottom:
+                      "4px",
+                  }}
+                >
+                  EDIT DRAFT INVOICE
+                </div>
+
+                <h2
+                  style={{
+                    margin: 0,
+                    color:
+                      "#172033",
+                    fontSize:
+                      "22px",
+                  }}
+                >
+                  {
+                    editInvoice.invoiceNo
+                  }
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                disabled={
+                  saving ||
+                  posting
+                }
+                onClick={() => {
+                  setEditInvoice(
+                    null
+                  );
+                  setModalError("");
+                }}
+                style={{
+                  border:
+                    "1px solid #d0d5dd",
+                  background:
+                    "#ffffff",
+                  color:
+                    "#344054",
+                  width: "34px",
+                  height: "34px",
+                  borderRadius:
+                    "8px",
+                  fontSize:
+                    "20px",
+                  cursor:
+                    "pointer",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {modalError && (
+              <div
+                style={{
+                  margin:
+                    "18px 24px 0",
+                  padding:
+                    "11px 14px",
+                  borderRadius:
+                    "8px",
+                  border:
+                    "1px solid #f1c0c0",
+                  background:
+                    "#fff7f7",
+                  color:
+                    "#b42318",
+                  fontSize:
+                    "13px",
+                  fontWeight:
+                    600,
+                }}
+              >
+                {modalError}
+              </div>
+            )}
+
+            <div
+              style={{
+                padding:
+                  "22px 24px",
+              }}
+            >
+              <div
+                style={{
+                  display:
+                    "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "14px",
+                  marginBottom:
+                    "22px",
+                }}
+              >
+                <label
+                  style={{
+                    display:
+                      "flex",
+                    flexDirection:
+                      "column",
+                    gap: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      color:
+                        "#475467",
+                      fontSize:
+                        "12px",
+                      fontWeight:
+                        700,
+                    }}
+                  >
+                    Invoice Number
+                  </span>
+
+                  <input
+                    value={
+                      editInvoiceNo
+                    }
+                    onChange={(e) =>
+                      setEditInvoiceNo(
+                        e.target.value
+                      )
+                    }
+                    style={{
+                      padding:
+                        "9px 11px",
+                      border:
+                        "1px solid #d8dee8",
+                      borderRadius:
+                        "8px",
+                      fontSize:
+                        "13px",
+                    }}
+                  />
+                </label>
+
+                <label
+                  style={{
+                    display:
+                      "flex",
+                    flexDirection:
+                      "column",
+                    gap: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      color:
+                        "#475467",
+                      fontSize:
+                        "12px",
+                      fontWeight:
+                        700,
+                    }}
+                  >
+                    Customer
+                  </span>
+
+                  <input
+                    value={
+                      editInvoice
+                        .customer
+                        ?.name ??
+                      "—"
+                    }
+                    disabled
+                    style={{
+                      padding:
+                        "9px 11px",
+                      border:
+                        "1px solid #d8dee8",
+                      borderRadius:
+                        "8px",
+                      fontSize:
+                        "13px",
+                      background:
+                        "#f8fafc",
+                      color:
+                        "#667085",
+                    }}
+                  />
+                </label>
+
+                <label
+                  style={{
+                    display:
+                      "flex",
+                    flexDirection:
+                      "column",
+                    gap: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      color:
+                        "#475467",
+                      fontSize:
+                        "12px",
+                      fontWeight:
+                        700,
+                    }}
+                  >
+                    Invoice Date
+                  </span>
+
+                  <input
+                    type="date"
+                    value={
+                      editInvoiceDate
+                    }
+                    onChange={(e) =>
+                      setEditInvoiceDate(
+                        e.target.value
+                      )
+                    }
+                    style={{
+                      padding:
+                        "9px 11px",
+                      border:
+                        "1px solid #d8dee8",
+                      borderRadius:
+                        "8px",
+                      fontSize:
+                        "13px",
+                    }}
+                  />
+                </label>
+
+                <label
+                  style={{
+                    display:
+                      "flex",
+                    flexDirection:
+                      "column",
+                    gap: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      color:
+                        "#475467",
+                      fontSize:
+                        "12px",
+                      fontWeight:
+                        700,
+                    }}
+                  >
+                    Due Date
+                  </span>
+
+                  <input
+                    type="date"
+                    value={
+                      editDueDate
+                    }
+                    onChange={(e) =>
+                      setEditDueDate(
+                        e.target.value
+                      )
+                    }
+                    style={{
+                      padding:
+                        "9px 11px",
+                      border:
+                        "1px solid #d8dee8",
+                      borderRadius:
+                        "8px",
+                      fontSize:
+                        "13px",
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div
+                style={{
+                  border:
+                    "1px solid #e4e8ef",
+                  borderRadius:
+                    "12px",
+                  overflow:
+                    "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    padding:
+                      "13px 16px",
+                    background:
+                      "#f8fafc",
+                    borderBottom:
+                      "1px solid #e4e8ef",
+                    fontWeight:
+                      800,
+                    color:
+                      "#172033",
+                  }}
+                >
+                  Invoice Items
+                </div>
+
+                <div
+                  style={{
+                    overflowX:
+                      "auto",
+                  }}
+                >
+                  <table
+                    style={{
+                      width:
+                        "100%",
+                      minWidth:
+                        "900px",
+                      borderCollapse:
+                        "collapse",
+                      fontSize:
+                        "12px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          borderBottom:
+                            "1px solid #edf0f5",
+                        }}
+                      >
+                        {[
+                          "Product",
+                          "Batch",
+                          "Warehouse",
+                          "Qty",
+                          "Unit Price",
+                          "Discount",
+                          "Tax",
+                          "Description",
+                        ].map(
+                          (heading) => (
+                            <th
+                              key={
+                                heading
+                              }
+                              style={{
+                                padding:
+                                  "10px 8px",
+                                textAlign:
+                                  "left",
+                                color:
+                                  "#667085",
+                                fontSize:
+                                  "10px",
+                                textTransform:
+                                  "uppercase",
+                              }}
+                            >
+                              {
+                                heading
+                              }
+                            </th>
+                          )
+                        )}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {editLines.map(
+                        (
+                          line,
+                          index
+                        ) => {
+                          const original =
+                            editInvoice.lines?.[
+                              index
+                            ];
+
+                          return (
+                            <tr
+                              key={
+                                original?.id ??
+                                index
+                              }
+                              style={{
+                                borderBottom:
+                                  "1px solid #edf0f5",
+                              }}
+                            >
+                              <td
+                                style={{
+                                  padding:
+                                    "9px 8px",
+                                  fontWeight:
+                                    700,
+                                  minWidth:
+                                    "170px",
+                                }}
+                              >
+                                {original
+                                  ?.product
+                                  ?.name ??
+                                  line.productId}
+                              </td>
+
+                              <td
+                                style={{
+                                  padding:
+                                    "9px 8px",
+                                  minWidth:
+                                    "130px",
+                                }}
+                              >
+                                {original
+                                  ?.batch
+                                  ?.batchNumber ??
+                                  line.batchId}
+                              </td>
+
+                              <td
+                                style={{
+                                  padding:
+                                    "9px 8px",
+                                  minWidth:
+                                    "130px",
+                                }}
+                              >
+                                {original
+                                  ?.warehouse
+                                  ?.name ??
+                                  line.warehouseId}
+                              </td>
+
+                              <td
+                                style={{
+                                  padding:
+                                    "9px 8px",
+                                }}
+                              >
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={
+                                    line.quantity
+                                  }
+                                  onChange={(
+                                    e
+                                  ) =>
+                                    updateEditLine(
+                                      index,
+                                      "quantity",
+                                      e.target
+                                        .value
+                                    )
+                                  }
+                                  style={{
+                                    width:
+                                      "75px",
+                                    padding:
+                                      "7px",
+                                    border:
+                                      "1px solid #d8dee8",
+                                    borderRadius:
+                                      "7px",
+                                  }}
+                                />
+                              </td>
+
+                              <td
+                                style={{
+                                  padding:
+                                    "9px 8px",
+                                }}
+                              >
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={
+                                    line.unitPrice
+                                  }
+                                  onChange={(
+                                    e
+                                  ) =>
+                                    updateEditLine(
+                                      index,
+                                      "unitPrice",
+                                      e.target
+                                        .value
+                                    )
+                                  }
+                                  style={{
+                                    width:
+                                      "100px",
+                                    padding:
+                                      "7px",
+                                    border:
+                                      "1px solid #d8dee8",
+                                    borderRadius:
+                                      "7px",
+                                  }}
+                                />
+                              </td>
+
+                              <td
+                                style={{
+                                  padding:
+                                    "9px 8px",
+                                }}
+                              >
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={
+                                    line.discount
+                                  }
+                                  onChange={(
+                                    e
+                                  ) =>
+                                    updateEditLine(
+                                      index,
+                                      "discount",
+                                      e.target
+                                        .value
+                                    )
+                                  }
+                                  style={{
+                                    width:
+                                      "90px",
+                                    padding:
+                                      "7px",
+                                    border:
+                                      "1px solid #d8dee8",
+                                    borderRadius:
+                                      "7px",
+                                  }}
+                                />
+                              </td>
+
+                              <td
+                                style={{
+                                  padding:
+                                    "9px 8px",
+                                }}
+                              >
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={
+                                    line.tax
+                                  }
+                                  onChange={(
+                                    e
+                                  ) =>
+                                    updateEditLine(
+                                      index,
+                                      "tax",
+                                      e.target
+                                        .value
+                                    )
+                                  }
+                                  style={{
+                                    width:
+                                      "90px",
+                                    padding:
+                                      "7px",
+                                    border:
+                                      "1px solid #d8dee8",
+                                    borderRadius:
+                                      "7px",
+                                  }}
+                                />
+                              </td>
+
+                              <td
+                                style={{
+                                  padding:
+                                    "9px 8px",
+                                }}
+                              >
+                                <input
+                                  value={
+                                    line.description
+                                  }
+                                  onChange={(
+                                    e
+                                  ) =>
+                                    updateEditLine(
+                                      index,
+                                      "description",
+                                      e.target
+                                        .value
+                                    )
+                                  }
+                                  placeholder="Description"
+                                  style={{
+                                    width:
+                                      "150px",
+                                    padding:
+                                      "7px",
+                                    border:
+                                      "1px solid #d8dee8",
+                                    borderRadius:
+                                      "7px",
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        }
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display:
+                    "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "14px",
+                  marginTop:
+                    "20px",
+                }}
+              >
+                <label
+                  style={{
+                    display:
+                      "flex",
+                    flexDirection:
+                      "column",
+                    gap: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      color:
+                        "#475467",
+                      fontSize:
+                        "12px",
+                      fontWeight:
+                        700,
+                    }}
+                  >
+                    Invoice Discount
+                  </span>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={
+                      editDiscount
+                    }
+                    onChange={(e) =>
+                      setEditDiscount(
+                        Number(
+                          e.target.value
+                        ) || 0
+                      )
+                    }
+                    style={{
+                      padding:
+                        "9px 11px",
+                      border:
+                        "1px solid #d8dee8",
+                      borderRadius:
+                        "8px",
+                    }}
+                  />
+                </label>
+
+                <label
+                  style={{
+                    display:
+                      "flex",
+                    flexDirection:
+                      "column",
+                    gap: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      color:
+                        "#475467",
+                      fontSize:
+                        "12px",
+                      fontWeight:
+                        700,
+                    }}
+                  >
+                    Invoice Tax
+                  </span>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={
+                      editTax
+                    }
+                    onChange={(e) =>
+                      setEditTax(
+                        Number(
+                          e.target.value
+                        ) || 0
+                      )
+                    }
+                    style={{
+                      padding:
+                        "9px 11px",
+                      border:
+                        "1px solid #d8dee8",
+                      borderRadius:
+                        "8px",
+                    }}
+                  />
+                </label>
+
+                <div
+                  style={{
+                    padding:
+                      "11px 13px",
+                    border:
+                      "1px solid #e4e8ef",
+                    borderRadius:
+                      "9px",
+                    background:
+                      "#fbfcfe",
+                  }}
+                >
+                  <div
+                    style={{
+                      color:
+                        "#667085",
+                      fontSize:
+                        "11px",
+                      fontWeight:
+                        700,
+                      textTransform:
+                        "uppercase",
+                    }}
+                  >
+                    Calculated Subtotal
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop:
+                        "4px",
+                      color:
+                        "#172033",
+                      fontWeight:
+                        800,
+                      fontSize:
+                        "16px",
+                    }}
+                  >
+                    {money(
+                      editSubtotal()
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding:
+                      "11px 13px",
+                    border:
+                      "1px solid #e4e8ef",
+                    borderRadius:
+                      "9px",
+                    background:
+                      "#fbfcfe",
+                  }}
+                >
+                  <div
+                    style={{
+                      color:
+                        "#667085",
+                      fontSize:
+                        "11px",
+                      fontWeight:
+                        700,
+                      textTransform:
+                        "uppercase",
+                    }}
+                  >
+                    Calculated Total
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop:
+                        "4px",
+                      color:
+                        "#172033",
+                      fontWeight:
+                        800,
+                      fontSize:
+                        "16px",
+                    }}
+                  >
+                    {money(
+                      editTotal()
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <label
+                style={{
+                  display:
+                    "flex",
+                  flexDirection:
+                    "column",
+                  gap: "6px",
+                  marginTop:
+                    "16px",
+                }}
+              >
+                <span
+                  style={{
+                    color:
+                      "#475467",
+                    fontSize:
+                      "12px",
+                    fontWeight:
+                      700,
+                  }}
+                >
+                  Notes
+                </span>
+
+                <textarea
+                  value={
+                    editNotes
+                  }
+                  onChange={(e) =>
+                    setEditNotes(
+                      e.target.value
+                    )
+                  }
+                  rows={3}
+                  style={{
+                    resize:
+                      "vertical",
+                    padding:
+                      "9px 11px",
+                    border:
+                      "1px solid #d8dee8",
+                    borderRadius:
+                      "8px",
+                    fontSize:
+                      "13px",
+                  }}
+                />
+              </label>
+            </div>
+
+            <div
+              style={{
+                padding:
+                  "16px 24px",
+                borderTop:
+                  "1px solid #edf0f5",
+                display:
+                  "flex",
+                justifyContent:
+                  "flex-end",
+                gap: "9px",
+                flexWrap:
+                  "wrap",
+              }}
+            >
+              <button
+                type="button"
+                disabled={
+                  saving ||
+                  posting
+                }
+                onClick={() => {
+                  setEditInvoice(
+                    null
+                  );
+                  setModalError("");
+                }}
+                style={{
+                  border:
+                    "1px solid #d0d5dd",
+                  background:
+                    "#ffffff",
+                  color:
+                    "#344054",
+                  padding:
+                    "9px 15px",
+                  borderRadius:
+                    "8px",
+                  fontWeight:
+                    700,
+                  cursor:
+                    "pointer",
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  saving ||
+                  posting
+                }
+                onClick={() =>
+                  saveInvoice(
+                    false
+                  )
+                }
+                style={{
+                  border:
+                    "1px solid #7b61a8",
+                  background:
+                    "#ffffff",
+                  color:
+                    "#684f8d",
+                  padding:
+                    "9px 16px",
+                  borderRadius:
+                    "8px",
+                  fontWeight:
+                    700,
+                  cursor:
+                    saving ||
+                    posting
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity:
+                    saving ||
+                    posting
+                      ? 0.6
+                      : 1,
+                }}
+              >
+                {saving
+                  ? "Saving..."
+                  : "Save Changes"}
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  saving ||
+                  posting
+                }
+                onClick={() =>
+                  saveInvoice(
+                    true
+                  )
+                }
+                style={{
+                  border:
+                    "none",
+                  background:
+                    "#16a34a",
+                  color:
+                    "#ffffff",
+                  padding:
+                    "9px 16px",
+                  borderRadius:
+                    "8px",
+                  fontWeight:
+                    700,
+                  cursor:
+                    saving ||
+                    posting
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity:
+                    saving ||
+                    posting
+                      ? 0.6
+                      : 1,
+                }}
+              >
+                {posting
+                  ? "Saving & Posting..."
+                  : "Save & Post"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
