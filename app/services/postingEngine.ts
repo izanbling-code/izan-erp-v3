@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@/app/generated/prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -25,7 +25,7 @@ export async function postFinancialTransaction(payload: PostingPayload) {
     throw new Error(`ACID REJECTION: Journal is out of balance. Debits: ${totalDebit}, Credits: ${totalCredit}`);
   }
 
-  return await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async (tx: any) => {
     
     // Uses companyId to match your V2 multi-tenant architecture
     const counter = await tx.sequenceCounter.upsert({
