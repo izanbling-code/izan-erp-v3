@@ -75,7 +75,7 @@ export default function MonthlyClosingsPage() {
   }
 
   return (
-    <ERPShell>
+    <ERPShell title="Monthly Closings & Fiscal Periods">
       <div className="max-w-6xl mx-auto p-6 space-y-6 text-xs">
         {/* Header */}
         <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">

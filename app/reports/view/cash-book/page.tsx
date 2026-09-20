@@ -36,7 +36,7 @@ export default function CashBookReport() {
   const formatCurrency = (amt: number) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(Math.abs(amt));
 
   return (
-    <ERPShell>
+    <ERPShell title="Cash Book Register">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         
         <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">

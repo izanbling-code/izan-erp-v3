@@ -190,10 +190,10 @@ export default function BankReconciliationPage() {
   const formatCurrency = (amt: number) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amt);
   const matchedCount = statementLines.filter(l => l.matchedToId).length;
 
-  if (loading) return <ERPShell><div className="p-10 text-center text-gray-500">Loading Auto-Reconciler...</div></ERPShell>;
+  if (loading) return <ERPShell title="Reconcile"><div className="p-10 text-center text-gray-500">Loading Auto-Reconciler...</div></ERPShell>;
 
   return (
-    <ERPShell>
+    <ERPShell title="Bank Reconciliation">
       <div className="max-w-7xl mx-auto p-6 space-y-6 text-sm">
         <div className="bg-gray-900 p-6 rounded-xl shadow-sm text-white flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
@@ -244,12 +244,12 @@ export default function BankReconciliationPage() {
                       </div>
                       {/* QUICK ADD / UNMATCH BUTTONS */}
                       {!line.matchedToId && (
-                        <button onClick={(e) => { e.stopPropagation(); openAddModal(line); }} className="h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold flex items-center justify-center transition">
+                        <button onClick={(e) => { e.stopPropagation(); openAddModal(line); }} className="h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold flex items-center justify-center transition" title="Add to ERP">
                           +
                         </button>
                       )}
                       {line.matchedToId && (
-                        <button onClick={(e) => { e.stopPropagation(); unmatch(line.id, line.matchedToId as string); }} className="text-xs text-rose-500 hover:text-rose-700 font-bold px-2 py-1 bg-white border border-rose-200 rounded">
+                        <button onClick={(e) => { e.stopPropagation(); unmatch(line.id, line.matchedToId as string); }} className="text-xs text-rose-500 hover:text-rose-700 font-bold px-2 py-1 bg-white border border-rose-200 rounded" title="Unmatch">
                           ✕
                         </button>
                       )}

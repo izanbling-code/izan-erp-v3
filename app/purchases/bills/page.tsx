@@ -143,7 +143,7 @@ export default function PurchaseBillsPage() {
   }
 
   return (
-    <ERPShell>
+    <ERPShell title="Purchase Bills">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex-wrap gap-4">
           <div>
