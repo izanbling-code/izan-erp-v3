@@ -101,13 +101,13 @@ export default function BankControlPanel() {
 
   const formatCurrency = (amt: number) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amt);
 
-  if (loading) return <ERPShell title="Bank Panel"><div className="p-10 text-center text-gray-500">Loading Control Panel...</div></ERPShell>;
-  if (!bank) return <ERPShell title="Bank Panel"><div className="p-10 text-center text-red-500">Bank Account Not Found</div></ERPShell>;
+  if (loading) return <ERPShell><div className="p-10 text-center text-gray-500">Loading Control Panel...</div></ERPShell>;
+  if (!bank) return <ERPShell><div className="p-10 text-center text-red-500">Bank Account Not Found</div></ERPShell>;
 
   const pendingTxs = transactions.filter(t => t.status === "PENDING");
 
   return (
-    <ERPShell title={`${bank.bankName} Control Panel`}>
+    <ERPShell Control Panel`}>
       <div className="max-w-6xl mx-auto p-6 space-y-6 text-sm">
         <div className="bg-gray-900 p-6 rounded-xl shadow-sm text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>

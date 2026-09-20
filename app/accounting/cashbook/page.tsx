@@ -160,7 +160,7 @@ export default function CashBookPage() {
   const modalTitle = voucherType === "CRV" ? "Cash Receipt Voucher (CRV)" : voucherType === "CPV" ? "Cash Payment Voucher (CPV)" : "Contra Transfer Voucher (CTV)";
 
   return (
-    <ERPShell title="Cash Book & Banking">
+    <ERPShell>
       <div className="max-w-6xl mx-auto p-6 space-y-6 text-sm">
         
         {/* Header & Actions */}

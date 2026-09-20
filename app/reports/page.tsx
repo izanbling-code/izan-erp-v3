@@ -43,7 +43,7 @@ const SECTIONS: ReportSection[] = [
 
 export default function ReportsHubPage() {
   return (
-    <ERPShell title="Enterprise Reports Hub">
+    <ERPShell>
       <div className="max-w-7xl mx-auto p-6 space-y-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <h1 className="text-2xl font-bold text-gray-900">Reports Suite</h1>
