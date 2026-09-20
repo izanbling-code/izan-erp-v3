@@ -83,7 +83,7 @@ export default function BankDirectoryPage() {
   const totalLiquidity = accounts.filter(a => a.isActive).reduce((sum, acc) => sum + acc.totalBookBalance, 0);
 
   return (
-    <ERPShell title="Bank Directory">
+    <ERPShell>
       <div className="max-w-6xl mx-auto p-6 space-y-5 text-sm">
         
         {/* Sleek Header & Minimal Summary Widget */}
@@ -149,8 +149,8 @@ export default function BankDirectoryPage() {
                         <Link href={`/accounting/banking/${acc.id}`} className="bg-white border border-gray-200 hover:border-gray-300 text-gray-800 font-semibold py-1.5 px-3 rounded-lg text-xs transition shadow-sm">
                           Manage
                         </Link>
-                        <button onClick={() => openEditModal(acc)} className="p-1.5 text-gray-400 hover:text-blue-600 transition" title="Edit">✏️</button>
-                        <button onClick={() => handleDeleteBank(acc)} className="p-1.5 text-gray-400 hover:text-rose-600 transition" title="Delete">🗑️</button>
+                        <button onClick={() => openEditModal(acc)} className="p-1.5 text-gray-400 hover:text-blue-600 transition">✏️</button>
+                        <button onClick={() => handleDeleteBank(acc)} className="p-1.5 text-gray-400 hover:text-rose-600 transition">🗑️</button>
                       </div>
                     </td>
                   </tr>
