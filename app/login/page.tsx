@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@izan.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,7 +27,7 @@ export default function LoginPage() {
         router.push("/dashboard");
         router.refresh();
       } else {
-        setError(data.error || "Unable to connect to the server.");
+        setError(data.error || "Invalid credentials.");
       }
     } catch (err) {
       setError("Unable to connect to the server.");
@@ -38,42 +38,41 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#0B1121] flex items-center justify-center p-4 font-sans selection:bg-blue-500/30">
-      <div className="max-w-md w-full bg-[#131C2F] border border-slate-800/60 rounded-2xl shadow-2xl p-8">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20 mb-4">
-            <span className="text-2xl font-black text-white tracking-wider">IB</span>
+      <div className="max-w-sm w-full bg-[#131C2F] border border-slate-800/60 rounded-xl shadow-2xl p-6">
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center shadow-lg mb-3">
+            <span className="text-lg font-black text-white tracking-wider">IB</span>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-wide">Izan Bling ERP</h1>
-          <p className="text-sm text-slate-400 mt-2">Sign in to your account</p>
+          <h1 className="text-lg font-bold text-white tracking-wide">Izan Bling ERP</h1>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email</label>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-[#0B1121] text-white border border-slate-700 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition-all placeholder-slate-600"
+              className="w-full bg-[#0B1121] text-white border border-slate-700 rounded p-2 text-sm focus:border-blue-500 outline-none transition-all placeholder-slate-700"
               placeholder="admin@izan.com"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Password</label>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password</label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#0B1121] text-white border border-slate-700 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition-all placeholder-slate-600"
+              className="w-full bg-[#0B1121] text-white border border-slate-700 rounded p-2 text-sm focus:border-blue-500 outline-none transition-all placeholder-slate-700"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg text-center font-medium">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-2 rounded text-center font-medium">
               {error}
             </div>
           )}
@@ -81,25 +80,22 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3.5 rounded-lg text-sm transition-all shadow-lg shadow-blue-500/25 mt-2 uppercase tracking-wider"
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-2 rounded text-xs transition-all mt-2 uppercase tracking-wider"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
-
-        <div className="mt-8 text-center">
-          <p className="text-xs text-slate-600 font-medium">Izan Bling ERP V3</p>
-        </div>
       </div>
       
       <style dangerouslySetInnerHTML={{__html: `
-        /* Overrides Chrome's default white autofill background */
+        /* Overrides Chrome's aggressive white autofill styling */
         input:-webkit-autofill,
         input:-webkit-autofill:hover, 
         input:-webkit-autofill:focus, 
         input:-webkit-autofill:active{
             -webkit-box-shadow: 0 0 0 30px #0B1121 inset !important;
-            -webkit-text-fill-color: white !important;
+            -webkit-text-fill-color: #ffffff !important;
+            color: #ffffff !important;
         }
       `}} />
     </div>
