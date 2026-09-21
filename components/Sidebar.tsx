@@ -17,7 +17,7 @@ const menuGroups = [
     items: [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { name: "Quick Order", href: "/quick-order", icon: ShoppingCart },
-      { name: "POS Terminal", href: "/sales/pos", icon: Store },
+      { name: "Shop", href: "/shop/admin", icon: Store },
     ]
   },
   {
