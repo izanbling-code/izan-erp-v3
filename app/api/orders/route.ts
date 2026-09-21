@@ -72,6 +72,30 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
+    const company = await prisma.company.findFirst();
+
+    // ACTION 1: Mini-Invoice Editor (Add/Remove items before generation)
+    if (body.action === "UPDATE_LINES") {
+      await prisma.orderLine.deleteMany({ where: { orderId: body.id } });
+      const updatedOrder = await prisma.order.update({
+        where: { id: body.id },
+        data: {
+          totalAmount: body.totalAmount,
+          lines: {
+            create: body.lines.map((l: any) => ({
+              companyId: company!.id,
+              productId: l.productId,
+              quantity: l.quantity,
+              unitPrice: l.unitPrice,
+              subtotal: l.subtotal
+            }))
+          }
+        }
+      });
+      return NextResponse.json({ success: true, order: updatedOrder });
+    }
+
+    // ACTION 2: Status Updates & Dispatching
     const updated = await prisma.order.update({
       where: { id: body.id },
       data: {
@@ -81,6 +105,26 @@ export async function PUT(req: Request) {
         paymentStatus: body.paymentStatus
       }
     });
+
+    // If Dispatched, find the Draft Invoice and explicitly update its totals and formatted tracking data
+    if (body.status === "DISPATCHED") {
+      const invoice = await prisma.salesInvoice.findFirst({
+        where: { companyId: company!.id, notes: { contains: updated.orderNumber } }
+      });
+      
+      if (invoice) {
+        await prisma.salesInvoice.update({
+          where: { id: invoice.id },
+          data: {
+            deliveryCharges: Number(body.deliveryCharges),
+            total: Number(invoice.subtotal) + Number(body.deliveryCharges),
+            // Strictly formatted so your future web orders list can parse this easily
+            notes: `Order: ${updated.orderNumber} | Courier: ${body.courierName} | Tracking: ${body.trackingNumber} | Payment: ${body.paymentStatus}`
+          }
+        });
+      }
+    }
+
     return NextResponse.json({ success: true, order: updated });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
