@@ -239,7 +239,7 @@ export default function BankReconciliationPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <div className={`font-bold ${line.amount > 0 ? "text-emerald-700" : "text-rose-700"}`}>{formatCurrency(line.amount)}</div>
+                        <div className={`font-bold ${line.amount > 0 ? "text-emerald-700" : "text-rose-700"}>{formatCurrency(line.amount)}</div>
                         {line.matchedToId && <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mt-1">Matched ✓</div>}
                       </div>
                       {/* QUICK ADD / UNMATCH BUTTONS */}
@@ -280,7 +280,7 @@ export default function BankReconciliationPage() {
                     <div className="text-gray-500 mt-0.5">{tx.description}</div>
                   </div>
                   <div className="text-right">
-                    <div className={`font-bold ${tx.net > 0 ? "text-emerald-700" : "text-rose-700"}`}>{formatCurrency(tx.net)}</div>
+                    <div className={`font-bold ${tx.net > 0 ? "text-emerald-700" : "text-rose-700"}>{formatCurrency(tx.net)}</div>
                     {tx.status === "MATCHED" ? <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mt-1">Matched ✓</div> : <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">{tx.status}</div>}
                   </div>
                 </div>

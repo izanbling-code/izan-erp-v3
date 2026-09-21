@@ -97,7 +97,7 @@ export default function CashBookReport() {
                       </td>
                       <td className="py-3 px-4 font-mono text-xs font-bold text-indigo-700">{row.voucherId}</td>
                       <td className="py-3 px-4 text-gray-600 text-xs truncate max-w-[200px]">{row.description}</td>
-                      <td className={`py-3 px-4 text-right font-bold ${row.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <td className={`py-3 px-4 text-right font-bold ${row.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
                         {row.amount >= 0 ? "" : "-"} {formatCurrency(row.amount)}
                       </td>
                       <td className="py-3 px-4 text-right font-bold text-gray-900">{formatCurrency(row.balance)}</td>

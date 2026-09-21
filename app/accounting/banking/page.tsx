@@ -125,7 +125,7 @@ export default function BankDirectoryPage() {
                 <tr><td colSpan={5} className="py-8 text-center text-gray-400">No bank accounts registered.</td></tr>
               ) : (
                 accounts.map((acc) => (
-                  <tr key={acc.id} className={`hover:bg-gray-50/50 transition ${!acc.isActive ? "opacity-60 bg-gray-50" : ""}`}>
+                  <tr key={acc.id} className={`hover:bg-gray-50/50 transition ${!acc.isActive ? "opacity-60 bg-gray-50" : ""}>
                     <td className="py-3 px-4">
                       <div className="font-bold text-gray-900">{acc.bankName}</div>
                       <div className="text-xs text-gray-500 mt-0.5">{acc.accountTitle}</div>

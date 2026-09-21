@@ -107,7 +107,7 @@ export default function BankControlPanel() {
   const pendingTxs = transactions.filter(t => t.status === "PENDING");
 
   return (
-    <ERPShell Control Panel`}>
+    <ERPShell Control 
       <div className="max-w-6xl mx-auto p-6 space-y-6 text-sm">
         <div className="bg-gray-900 p-6 rounded-xl shadow-sm text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -210,7 +210,7 @@ export default function BankControlPanel() {
                       <tr key={tx.id} className="hover:bg-emerald-50/50 transition cursor-pointer" onClick={() => setSelectedToClear(prev => prev.includes(tx.id) ? prev.filter(id => id !== tx.id) : [...prev, tx.id])}>
                         <td className="py-3 px-4"><input type="checkbox" checked={selectedToClear.includes(tx.id)} readOnly className="w-4 h-4 rounded text-emerald-600 border-gray-300 pointer-events-none" /></td>
                         <td className="py-3 px-4"><div className="font-bold text-gray-900">{tx.reference || "—"}</div><div className="text-xs text-gray-500">{new Date(tx.transactionDate).toISOString().slice(0, 10)}</div></td>
-                        <td className="py-3 px-4 text-gray-700 text-xs">{tx.description}</td><td className={`py-3 px-4 text-right font-bold ${tx.moneyIn > 0 ? "text-emerald-600" : "text-rose-600"}`}>{tx.moneyIn > 0 ? `+ ${formatCurrency(tx.moneyIn)}` : `- ${formatCurrency(tx.moneyOut)}`}</td>
+                        <td className="py-3 px-4 text-gray-700 text-xs">{tx.description}</td><td className={`py-3 px-4 text-right font-bold ${tx.moneyIn > 0 ? "text-emerald-600" : "text-rose-600"}>{tx.moneyIn > 0 ? `+ ${formatCurrency(tx.moneyIn)}` : `- ${formatCurrency(tx.moneyOut)}`}</td>
                       </tr>
                     ))
                   )}

@@ -268,7 +268,7 @@ export default function CashBookPage() {
       {showModal && (
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className={`p-5 text-white ${voucherType === "CRV" ? "bg-emerald-600" : voucherType === "CPV" ? "bg-rose-600" : "bg-indigo-600"} flex justify-between items-center`}>
+            <div className={`p-5 text-white ${voucherType === "CRV" ? "bg-emerald-600" : voucherType === "CPV" ? "bg-rose-600" : "bg-indigo-600"} flex justify-between items-center>
               <div>
                 <h2 className="text-lg font-bold">{modalTitle}</h2>
                 <p className="text-white/80 text-xs mt-0.5">Post an active transaction to the general ledger.</p>
@@ -312,7 +312,7 @@ export default function CashBookPage() {
 
               <div className="pt-4 flex justify-end gap-3 border-t mt-2">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-lg font-semibold text-gray-600 hover:bg-gray-50 text-sm">Cancel</button>
-                <button type="submit" disabled={submitting} className={`px-5 py-2 rounded-lg font-bold text-white text-sm ${voucherType === "CRV" ? "bg-emerald-600 hover:bg-emerald-700" : voucherType === "CPV" ? "bg-rose-600 hover:bg-rose-700" : "bg-indigo-600 hover:bg-indigo-700"} disabled:opacity-50`}>
+                <button type="submit" disabled={submitting} className={`px-5 py-2 rounded-lg font-bold text-white text-sm ${voucherType === "CRV" ? "bg-emerald-600 hover:bg-emerald-700" : voucherType === "CPV" ? "bg-rose-600 hover:bg-rose-700" : "bg-indigo-600 hover:bg-indigo-700"} disabled:opacity-50>
                   {submitting ? "Posting..." : "Post Voucher"}
                 </button>
               </div>

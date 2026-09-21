@@ -142,7 +142,7 @@ export default function MonthlyClosingsPage() {
                           isOpen ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
                           isLocked ? "bg-amber-50 text-amber-700 border border-amber-200" :
                           "bg-rose-50 text-rose-700 border border-rose-200"
-                        }`}>
+                        }>
                           {p.status}
                         </span>
                       </td>
