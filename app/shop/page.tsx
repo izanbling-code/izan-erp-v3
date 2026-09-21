@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ShoppingBag, Plus, Minus, Trash2, CheckCircle2, PackageOpen, Send, UploadCloud } from "lucide-react";
 
-export default function CustomerShopPage() {
+function CustomerShopPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<any[]>([]);
@@ -205,6 +205,15 @@ export default function CustomerShopPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Viewport Breakout Wrapper to hide ERP Layout
+export default function PublicShopWrapper() {
+  return (
+    <div className="fixed inset-0 z-[99999] bg-[#0B1120] overflow-y-auto w-screen h-screen m-0 p-0 block">
+      <CustomerShopPage />
     </div>
   );
 }
