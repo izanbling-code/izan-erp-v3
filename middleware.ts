@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname === '/shop' || request.nextUrl.pathname.startsWith('/api/shop/checkout')) return NextResponse.next();
+
   const { pathname } = request.nextUrl;
   const isApiRoute = pathname.startsWith("/api/");
   const sessionCookie = request.cookies.get("ib_session")?.value;
@@ -63,6 +65,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|public).*)",
+    "/((?!shop|api/shop/checkout|_next/static|_next/image|favicon.ico|public).*)",
   ],
 };
