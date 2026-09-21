@@ -1,12 +1,28 @@
 ﻿import { NextResponse } from "next/server";
+import nodemailer from "nodemailer";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    // Here you can integrate an email service or save to database later
-    console.log("Contact Form Submission:", body);
-    return NextResponse.json({ success: true, message: "Message received!" });
+    const { name, email, message } = await req.json();
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: process.env.GMAIL_USER,
+      subject: `New Contact Form Submission from ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+    });
+
+    return NextResponse.json({ success: true, message: "Email sent successfully!" });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to submit message" }, { status: 500 });
+    console.error("Nodemailer Error:", error);
+    return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
   }
 }

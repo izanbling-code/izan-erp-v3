@@ -1,83 +1,59 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { name, phone, address, city, cart, totalAmount } = await request.json();
-
-    if (!name || !phone || !address || !cart || cart.length === 0) {
-      return NextResponse.json({ error: "Missing required contact details or cart items" }, { status: 400 });
-    }
-
-    // Find the first available company in the DB to associate public store orders
+    const { cart, details } = await req.json();
+    
+    // We assume a single primary company for the storefront
     const company = await prisma.company.findFirst();
-    if (!company) {
-      return NextResponse.json({ error: "No company configured" }, { status: 500 });
-    }
+    if (!company) throw new Error("No company found in database");
 
-    const order = await prisma.$transaction(async (tx) => {
-      // 1. Create or update customer record automatically from public checkout
-      let customer = await tx.customer.findFirst({
-        where: { companyId: company.id, phone }
-      });
-
-      if (customer) {
-        customer = await tx.customer.update({
-          where: { id: customer.id },
-          data: { name, address, city }
-        });
-      } else {
-        customer = await tx.customer.create({
-          data: { companyId: company.id, name, phone, address, city }
-        });
-      }
-
-      // 2. Generate sequential order number
-      let counter = await tx.sequenceCounter.findUnique({
-        where: { tenantId_model: { tenantId: company.id, model: "Order" } }
-      });
-      
-      let currentVal = 1;
-      if (counter) {
-        currentVal = counter.nextVal;
-        await tx.sequenceCounter.update({
-          where: { id: counter.id },
-          data: { nextVal: currentVal + 1 }
-        });
-      } else {
-        await tx.sequenceCounter.create({
-          data: { tenantId: company.id, model: "Order", prefix: "ORD-", nextVal: 2 }
-        });
-      }
-      
-      const orderNum = `ORD-${String(currentVal).padStart(6, '0')}`;
-
-      // 3. Create the Order in Pending status
-      const newOrder = await tx.order.create({
-        data: {
-          companyId: company.id,
-          customerId: customer.id,
-          orderNumber: orderNum,
-          status: "SALE_ORDER",
-          totalAmount,
-          lines: {
-            create: cart.map((item: any) => ({
-              productId: item.id,
-              companyId: company.id,
-              quantity: item.qty,
-              unitPrice: item.price,
-              subtotal: item.price * item.qty
-            }))
-          }
-        }
-      });
-
-      return newOrder;
+    // 1. Find or create the customer based on phone number
+    let customer = await prisma.customer.findFirst({
+      where: { phone: details.phone, companyId: company.id }
     });
 
-    return NextResponse.json({ success: true, orderNumber: order.orderNumber });
+    if (!customer) {
+      customer = await prisma.customer.create({
+        data: {
+          companyId: company.id,
+          name: details.name,
+          phone: details.phone,
+          address: details.address,
+        }
+      });
+    }
+
+    // 2. Calculate totals and generate a random order number
+    const totalAmount = cart.reduce((sum: number, item: any) => sum + (item.price * item.qty), 0);
+    const orderNumber = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    // 3. Create the Order and OrderLines in a transaction
+    const order = await prisma.order.create({
+      data: {
+        companyId: company.id,
+        orderNumber,
+        customerId: customer.id,
+        status: "SALE_ORDER",
+        paymentStatus: details.paymentStatus === "Uploaded Slip" ? "PENDING" : "PENDING",
+        totalAmount,
+        paymentSlipUrl: details.paymentRef || null,
+        lines: {
+          create: cart.map((item: any) => ({
+            companyId: company.id,
+            productId: item.id,
+            quantity: item.qty,
+            unitPrice: item.price,
+            subtotal: item.price * item.qty,
+          }))
+        }
+      }
+    });
+
+    return NextResponse.json({ success: true, orderId: order.id, orderNumber });
   } catch (error) {
-    console.error("Shop Checkout Error:", error);
-    return NextResponse.json({ error: "Failed to process shop checkout" }, { status: 500 });
+    console.error("Checkout Error:", error);
+    return NextResponse.json({ error: "Failed to process order" }, { status: 500 });
   }
 }

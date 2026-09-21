@@ -277,6 +277,7 @@ model Product {
   name               String
   sku                String
   description        String?
+  imageUrl           String?
   type               ProductType @default(GOODS)
   costPrice          Decimal     @default(0)
   salePrice          Decimal     @default(0)
@@ -979,6 +980,7 @@ model Order {
   companyId       String
   orderNumber     String
   customerId      String
+  paymentSlipUrl  String?
   
   status          OrderStatus   @default(SALE_ORDER)
   paymentStatus   PaymentStatus @default(PENDING)
