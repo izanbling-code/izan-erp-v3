@@ -1,30 +1,45 @@
 ﻿import { prisma } from "@/app/lib/prisma";
-import { notFound } from "next/navigation";
 import ShopNavbar from "@/app/components/ShopNavbar";
 import AddToCartButton from "@/app/components/AddToCartButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductPage({ params }: { params: { id: string } }) {
-  let product = null;
+export default async function ProductPage({ params }: { params: any }) {
+  // 1. Safely await params to prevent Next.js crashes
+  const resolvedParams = await params;
+  const productId = resolvedParams.id;
 
-  if (["1", "2", "3", "4"].includes(params.id)) {
-    const dummies = [
-      { id: '1', name: 'Classic Gold Chain', sku: 'DUMMY-01', salePrice: 12000, description: 'A beautiful classic gold chain.', imageUrl: 'https://placehold.co/600x600?text=Gold+Chain' },
-      { id: '2', name: 'Diamond Stud Earrings', sku: 'DUMMY-02', salePrice: 35000, description: 'Elegant diamond stud earrings.', imageUrl: 'https://placehold.co/600x600?text=Earrings' },
-      { id: '3', name: 'Silver Tennis Bracelet', sku: 'DUMMY-03', salePrice: 21000, description: 'A sleek silver tennis bracelet.', imageUrl: 'https://placehold.co/600x600?text=Bracelet' },
-      { id: '4', name: 'Vintage Pearl Ring', sku: 'DUMMY-04', salePrice: 18000, description: 'A stunning vintage pearl ring.', imageUrl: 'https://placehold.co/600x600?text=Pearl+Ring' },
-    ];
-    product = dummies.find(d => d.id === params.id);
-  } else {
-    try {
-      product = await prisma.product.findUnique({ where: { id: params.id } });
-    } catch (error) {
-      return notFound();
+  let product = null;
+  let errorMessage = null;
+
+  try {
+    if (["1", "2", "3", "4"].includes(productId)) {
+      const dummies = [
+        { id: '1', name: 'Classic Gold Chain', sku: 'DUMMY-01', salePrice: 12000, description: 'A beautiful classic gold chain.', imageUrl: 'https://placehold.co/600x600?text=Gold+Chain' },
+        { id: '2', name: 'Diamond Stud Earrings', sku: 'DUMMY-02', salePrice: 35000, description: 'Elegant diamond stud earrings.', imageUrl: 'https://placehold.co/600x600?text=Earrings' },
+        { id: '3', name: 'Silver Tennis Bracelet', sku: 'DUMMY-03', salePrice: 21000, description: 'A sleek silver tennis bracelet.', imageUrl: 'https://placehold.co/600x600?text=Bracelet' },
+        { id: '4', name: 'Vintage Pearl Ring', sku: 'DUMMY-04', salePrice: 18000, description: 'A stunning vintage pearl ring.', imageUrl: 'https://placehold.co/600x600?text=Pearl+Ring' },
+      ];
+      product = dummies.find(d => d.id === productId);
+    } else {
+      product = await prisma.product.findUnique({ where: { id: productId } });
     }
+  } catch (error: any) {
+    errorMessage = error.message;
   }
 
-  if (!product) return notFound();
+  // 2. Render a custom full-screen Shop error instead of falling back to the ERP layout
+  if (!product) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-white flex flex-col font-sans text-gray-900 overflow-y-auto">
+         <ShopNavbar />
+         <div className="flex-grow flex flex-col items-center justify-center mt-20">
+           <h1 className="text-3xl font-light mb-4">Product Not Found</h1>
+           <p className="text-gray-500">{errorMessage || "The item you are looking for does not exist or has been removed."}</p>
+         </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] bg-white overflow-y-auto flex flex-col font-sans text-gray-900">
