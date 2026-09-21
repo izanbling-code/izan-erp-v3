@@ -3,57 +3,66 @@ import { prisma } from "@/app/lib/prisma";
 
 export async function POST(req: Request) {
   try {
-    const { cart, details } = await req.json();
+    const body = await req.json();
+    let company = await prisma.company.findFirst();
     
-    // We assume a single primary company for the storefront
-    const company = await prisma.company.findFirst();
-    if (!company) throw new Error("No company found in database");
+    if (!company) {
+      return NextResponse.json({ error: "No master company found in ERP." }, { status: 500 });
+    }
 
-    // 1. Find or create the customer based on phone number
+    // 1. Find or Create the Customer based on Phone Number
     let customer = await prisma.customer.findFirst({
-      where: { phone: details.phone, companyId: company.id }
+      where: { companyId: company.id, phone: body.customer.phone }
     });
 
     if (!customer) {
       customer = await prisma.customer.create({
         data: {
           companyId: company.id,
-          name: details.name,
-          phone: details.phone,
-          address: details.address,
+          name: body.customer.name,
+          phone: body.customer.phone,
+          address: body.customer.address,
+          whatsapp: body.customer.phone // Save phone to WhatsApp field for easy contact
         }
       });
     }
 
-    // 2. Calculate totals and generate a random order number
-    const totalAmount = cart.reduce((sum: number, item: any) => sum + (item.price * item.qty), 0);
-    const orderNumber = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+    // 2. Generate Order Number
+    const orderCount = await prisma.order.count({ where: { companyId: company.id } });
+    const orderNumber = `ORD-${String(orderCount + 1).padStart(5, '0')}`;
 
-    // 3. Create the Order and OrderLines in a transaction
+    // 3. Create the Order (Using your strict schema enums)
     const order = await prisma.order.create({
       data: {
         companyId: company.id,
-        orderNumber,
         customerId: customer.id,
+        orderNumber: orderNumber,
         status: "SALE_ORDER",
-        paymentStatus: details.paymentStatus === "Uploaded Slip" ? "PENDING" : "PENDING",
-        totalAmount,
-        paymentSlipUrl: details.paymentRef || null,
-        lines: {
-          create: cart.map((item: any) => ({
-            companyId: company.id,
-            productId: item.id,
-            quantity: item.qty,
-            unitPrice: item.price,
-            subtotal: item.price * item.qty,
-          }))
-        }
+        paymentStatus: "PENDING",
+        totalAmount: Number(body.total),
+        paymentSlipUrl: body.paymentSlipUrl || null,
+        // Passing delivery address and payment method to whatsappRef since your Order model has no notes field
+        whatsappRef: `Delivery: ${body.customer.address} | Method: ${body.paymentMethod}` 
       }
     });
 
-    return NextResponse.json({ success: true, orderId: order.id, orderNumber });
-  } catch (error) {
-    console.error("Checkout Error:", error);
-    return NextResponse.json({ error: "Failed to process order" }, { status: 500 });
+    // 4. Create the Order Lines (Items)
+    for (const item of body.items) {
+      await prisma.orderLine.create({
+        data: {
+          orderId: order.id,
+          productId: item.id,
+          companyId: company.id,
+          quantity: 1, // Modify this later if you allow qty > 1 in cart
+          unitPrice: Number(item.salePrice),
+          subtotal: Number(item.salePrice)
+        }
+      });
+    }
+
+    return NextResponse.json({ success: true, orderId: order.id });
+  } catch (error: any) {
+    console.error("Strict Checkout Error:", error);
+    return NextResponse.json({ error: error.message || "Failed to process order. Schema mismatch." }, { status: 500 });
   }
 }
