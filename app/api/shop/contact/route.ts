@@ -1,28 +1,36 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
 export async function POST(req: Request) {
   try {
-    const { name, email, message } = await req.json();
+    const formData = await req.formData();
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
+    const message = formData.get("message") as string;
+
+    if (!process.env.GMAIL_APP_PASSWORD) {
+        return NextResponse.redirect(new URL("/shop?contact=error", req.url));
+    }
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.GMAIL_USER,
+        user: "izanbling@gmail.com",
         pass: process.env.GMAIL_APP_PASSWORD,
       },
     });
 
     await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: process.env.GMAIL_USER,
-      subject: `New Contact Form Submission from ${name}`,
-      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+      from: "izanbling@gmail.com",
+      to: "izanbling@gmail.com",
+      replyTo: email,
+      subject: `New Message from ${name} (Izan Bling Shop)`,
+      text: message,
     });
 
-    return NextResponse.json({ success: true, message: "Email sent successfully!" });
+    return NextResponse.redirect(new URL("/shop?contact=success", req.url));
   } catch (error) {
-    console.error("Nodemailer Error:", error);
-    return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
+    console.error("Contact Error:", error);
+    return NextResponse.redirect(new URL("/shop?contact=error", req.url));
   }
 }
