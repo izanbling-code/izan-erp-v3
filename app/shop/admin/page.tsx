@@ -1,120 +1,132 @@
-"use client";
-
+﻿"use client";
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Edit3, Save, Package, Image as ImageIcon, ArrowLeft } from "lucide-react";
-import Link from "next/link";
 
-export default function ShopAdminPage() {
-  const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [category, setCategory] = useState("General");
-  const [imageUrl, setImageUrl] = useState("");
-  const [stock, setStock] = useState("10");
+export default function ShopAdmin() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({ name: "", price: "", sku: "", description: "", imageUrl: "" });
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
-  const fetchItems = async () => {
-    setLoading(true);
-    const res = await fetch("/api/shop/admin/items");
-    const data = await res.json();
-    if (data.success) setItems(data.items);
-    setLoading(false);
+  const fetchProducts = () => {
+    fetch("/api/shop/admin/products").then(res => res.json()).then(data => {
+      if (Array.isArray(data)) setProducts(data);
+    });
   };
 
-  useEffect(() => { fetchItems(); }, []);
+  useEffect(() => { fetchProducts(); }, []);
 
-  const handleAddItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !price) return alert("Name and price are required.");
-
-    const res = await fetch("/api/shop/admin/items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, price: Number(price), category, image: imageUrl || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500", stock: Number(stock) })
-    });
+  const handleImageUpload = async () => {
+    if (!imageFile) return formData.imageUrl;
+    const data = new FormData();
+    data.append("file", imageFile);
     
-    if (res.ok) {
-      setName(""); setPrice(""); setImageUrl("");
-      fetchItems();
-    } else {
-      alert("Failed to add item");
+    const res = await fetch("/api/shop/upload", { method: "POST", body: data });
+    const json = await res.json();
+    
+    if (json.error) throw new Error(json.error);
+    return json.url;
+  };
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const uploadedUrl = await handleImageUpload();
+      
+      const res = await fetch("/api/shop/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, imageUrl: uploadedUrl || formData.imageUrl })
+      });
+      
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+
+      setFormData({ name: "", price: "", sku: "", description: "", imageUrl: "" });
+      setImageFile(null);
+      fetchProducts();
+      alert("Product added successfully!");
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this item?")) return;
-    await fetch(`/api/shop/admin/items?id=${id}`, { method: "DELETE" });
-    fetchItems();
+    if (confirm("Delete this product?")) {
+      await fetch(`/api/shop/admin/products?id=${id}`, { method: "DELETE" });
+      fetchProducts();
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#0B1121] text-slate-200 p-8 font-sans">
-      <div className="max-w-6xl mx-auto space-y-8">
-        
-        <div className="flex justify-between items-center">
-          <div>
-            <Link href="/dashboard" className="text-xs text-blue-400 hover:underline flex items-center gap-1 mb-2">
-              <ArrowLeft className="w-3 h-3" /> Back to ERP Dashboard
-            </Link>
-            <h1 className="text-3xl font-black text-white">Public Store Manager</h1>
-            <p className="text-sm text-slate-400">Add products, upload pictures, and manage what customers see online.</p>
-          </div>
-          <Link href="/shop" target="_blank" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all">
-            View Live Public Shop ↗
-          </Link>
-        </div>
-
-        {/* Add Item Form */}
-        <form onSubmit={handleAddItem} className="bg-[#131C2F] border border-slate-800 rounded-3xl p-6 grid grid-cols-1 md:grid-cols-6 gap-4 items-end shadow-xl">
-          <div className="md:col-span-2">
-            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Item Name</label>
-            <input type="text" placeholder="e.g. Luxury Watch" value={name} onChange={e => setName(e.target.value)} required className="w-full bg-[#0B1121] border border-slate-700 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Price (Rs)</label>
-            <input type="number" placeholder="2500" value={price} onChange={e => setPrice(e.target.value)} required className="w-full bg-[#0B1121] border border-slate-700 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Category</label>
-            <input type="text" placeholder="Accessories" value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-[#0B1121] border border-slate-700 rounded-lg p-3 text-sm text-white outline-none focus:border-blue-500" />
-          </div>
-          <div className="md:col-span-2">
-            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Image URL (Picture Link)</label>
-            <input type="url" placeholder="https://image-link.com/photo.jpg" value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="w-full bg-[#0B1121] border border-slate-700 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500" />
-          </div>
-          <div className="md:col-span-6 flex justify-end">
-            <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl text-sm shadow-lg transition-all flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Add Item to Public Catalog
-            </button>
-          </div>
-        </form>
-
-        {/* Items List */}
-        <div className="bg-[#131C2F] border border-slate-800 rounded-3xl p-6 shadow-xl">
-          <h3 className="text-lg font-bold text-white mb-4">Active Online Items ({items.length})</h3>
-          {loading ? (
-            <p className="text-slate-500 text-center py-8">Loading items...</p>
-          ) : items.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">No online items found. Add one above!</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {items.map(item => (
-                <div key={item.id} className="bg-[#0B1121] border border-slate-800 rounded-2xl p-4 flex gap-4 items-center">
-                  <img src={item.image} alt={item.name} className="w-16 h-16 rounded-xl object-cover border border-slate-800" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-white text-sm truncate">{item.name}</h4>
-                    <p className="text-xs text-emerald-400 font-bold mt-1">Rs {item.price}</p>
-                    <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded font-bold uppercase mt-1 inline-block">{item.category}</span>
-                  </div>
-                  <button onClick={() => handleDelete(item.id)} className="text-slate-600 hover:text-rose-400 p-2">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+    <div className="p-8 max-w-6xl mx-auto space-y-8 text-gray-900">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Shop Admin Panel</h1>
+        <a href="/shop" target="_blank" className="bg-gray-900 text-white px-4 py-2 rounded text-sm hover:bg-gray-800">View Public Shop ↗</a>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="bg-white p-6 rounded-lg border shadow-sm col-span-1 h-fit">
+          <h2 className="font-semibold text-lg mb-4">Add New Product</h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs text-gray-500 uppercase font-semibold">Product Name</label>
+              <input required type="text" className="w-full border p-2 rounded mt-1 bg-white" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             </div>
-          )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 uppercase font-semibold">Price (PKR)</label>
+                <input required type="number" className="w-full border p-2 rounded mt-1 bg-white" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase font-semibold">SKU</label>
+                <input type="text" placeholder="Auto-generated" className="w-full border p-2 rounded mt-1 bg-white" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 uppercase font-semibold">Product Image</label>
+              <input type="file" accept="image/*" className="w-full border p-2 rounded mt-1 text-sm bg-white" onChange={e => setImageFile(e.target.files?.[0] || null)} />
+            </div>
+            <button disabled={loading} type="submit" className="w-full bg-blue-600 text-white py-3 rounded text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50">
+              {loading ? "Processing..." : "Save Product"}
+            </button>
+          </form>
         </div>
 
+        <div className="bg-white p-6 rounded-lg border shadow-sm col-span-1 md:col-span-2">
+          <h2 className="font-semibold text-lg mb-4">Live Inventory</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-3">Image</th>
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3">SKU</th>
+                  <th className="px-4 py-3">Price</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {products.length === 0 ? (
+                  <tr><td colSpan={5} className="py-8 text-center text-gray-400">No products added yet.</td></tr>
+                ) : products.map(p => (
+                  <tr key={p.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3"><img src={p.imageUrl || "https://placehold.co/100x100"} alt={p.name} className="w-10 h-10 object-cover rounded" /></td>
+                    <td className="px-4 py-3 font-medium">{p.name}</td>
+                    <td className="px-4 py-3 text-gray-500">{p.sku}</td>
+                    <td className="px-4 py-3">${Number(p.salePrice).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );
