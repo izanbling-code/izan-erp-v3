@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { Search, Plus, PackageOpen, Truck, ChevronRight, CheckCircle2, Printer } from "lucide-react";
@@ -18,6 +18,8 @@ export default function OrderPipelinePage() {
   const [cart, setCart] = useState<any[]>([]);
   
   const [activeOrder, setActiveOrder] = useState<any>(null);
+  const [allocations, setAllocations] = useState<Record<string, string>>({});
+  
   const [courierName, setCourierName] = useState("TCS");
   const [bookingRef, setBookingRef] = useState("");
   const [deliveryFee, setDeliveryFee] = useState<number | string>(0);
@@ -103,8 +105,44 @@ export default function OrderPipelinePage() {
     } catch (e) { alert("Network error."); } finally { setProcessing(false); }
   };
 
+  const handleGenerateOrder = async () => {
+    setProcessing(true);
+    const combinedTracking = bookingRef ? `${courierName} | ${bookingRef}` : "";
+    try {
+      const res = await fetch("/api/orders/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          orderId: activeOrder.id, 
+          allocations,
+          courierName,
+          bookingRef: combinedTracking,
+          deliveryFee: Number(deliveryFee) || 0,
+          paymentStatus
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Order generated, stock deducted, and invoice created!");
+        await fetchPipelineData();
+        setView("list");
+        setActiveOrder(null);
+      } else {
+        alert("Generation failed: " + data.error);
+      }
+    } catch (e) { alert("Network error."); } finally { setProcessing(false); }
+  };
+
   const openManage = (order: any) => {
     setActiveOrder(order);
+    
+    // Pre-fill allocations with "AUTO"
+    const initialAllocations: Record<string, string> = {};
+    order.lines.forEach((line: any) => {
+      initialAllocations[line.id] = "AUTO";
+    });
+    setAllocations(initialAllocations);
+
     const trackingStr = order.bookingNumber || "";
     if (trackingStr.includes(" | ")) {
       const [cName, ref] = trackingStr.split(" | ");
@@ -266,31 +304,82 @@ export default function OrderPipelinePage() {
             </div>
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* ORDER ITEMS & ALLOCATION MATRIX */}
               <div>
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Order Items</h3>
-                <div className="space-y-3">
-                  {activeOrder.lines.map((line: any) => (
-                    <div key={line.id} className="flex justify-between items-center border-b border-slate-800/50 pb-3">
-                      <div>
-                        <p className="text-sm font-bold text-white">{line.product?.name}</p>
-                        <p className="text-xs text-slate-500">Qty: {line.quantity} x {formatCurrency(Number(line.unitPrice))}</p>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
+                  {activeOrder.status === "SALE_ORDER" ? "Batch Allocation" : "Order Items"}
+                </h3>
+                
+                {activeOrder.status === "SALE_ORDER" ? (
+                  <table className="w-full text-left text-sm mt-2">
+                    <thead className="text-[10px] uppercase text-slate-500 border-b border-slate-800">
+                      <tr>
+                        <th className="pb-2">Product</th>
+                        <th className="pb-2 text-center">Req</th>
+                        <th className="pb-2 text-center">Avail</th>
+                        <th className="pb-2 pl-2">Batch Selection</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {activeOrder.lines.map((line: any) => {
+                        const batches = line.product?.stockBatches || [];
+                        const totalAvailable = batches.reduce((sum: number, b: any) => sum + Number(b.quantity), 0);
+                        const isShort = Number(line.quantity) > totalAvailable;
+                        
+                        return (
+                          <tr key={line.id}>
+                            <td className="py-3 font-bold text-white text-xs pr-2">{line.product?.name}</td>
+                            <td className="py-3 text-center font-bold text-slate-300">{line.quantity}</td>
+                            <td className={`py-3 text-center font-bold ${isShort ? 'text-red-400' : 'text-emerald-400'}`}>{totalAvailable}</td>
+                            <td className="py-3 pl-2">
+                              <select
+                                value={allocations[line.id] || "AUTO"}
+                                onChange={e => setAllocations({...allocations, [line.id]: e.target.value})}
+                                className={`w-full bg-[#0B1121] text-white border p-2 text-xs rounded outline-none ${isShort ? 'border-red-500/50' : 'border-slate-700'}`}
+                              >
+                                <option value="AUTO">Auto (FIFO)</option>
+                                {batches.map((sb: any) => (
+                                  <option key={sb.id} value={sb.batch?.id}>
+                                    {sb.batch?.batchNumber} (Avail: {sb.quantity})
+                                  </option>
+                                ))}
+                              </select>
+                              {isShort && <p className="text-[10px] text-red-400 mt-1">Insufficient Stock</p>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="space-y-3">
+                    {activeOrder.lines.map((line: any) => (
+                      <div key={line.id} className="flex justify-between items-center border-b border-slate-800/50 pb-3">
+                        <div>
+                          <p className="text-sm font-bold text-white">{line.product?.name}</p>
+                          <p className="text-xs text-slate-500">Qty: {line.quantity} x {formatCurrency(Number(line.unitPrice))}</p>
+                        </div>
+                        <p className="font-bold text-slate-300">{formatCurrency(Number(line.subtotal))}</p>
                       </div>
-                      <p className="font-bold text-slate-300">{formatCurrency(Number(line.subtotal))}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="bg-[#0B1121] p-6 rounded-xl border border-slate-800">
+              {/* PROCESSING ACTIONS */}
+              <div className="bg-[#0B1121] p-6 rounded-xl border border-slate-800 h-fit">
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                   <Truck className="w-4 h-4" /> Processing Actions
                 </h3>
                 
                 {activeOrder.status === "SALE_ORDER" && (
                   <div className="space-y-4">
-                    <p className="text-sm text-slate-400">Order is pending review.</p>
-                    <button onClick={() => handleUpdateOrder("CONFIRMATION")} disabled={processing} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg text-sm">
-                      Confirm Order
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Confirming this order will permanently deduct the selected batches from your inventory and post a formal Sales Invoice.
+                    </p>
+                    <button onClick={handleGenerateOrder} disabled={processing} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg text-sm transition">
+                      {processing ? "Generating..." : "Generate & Deduct Stock"}
                     </button>
                   </div>
                 )}
@@ -348,7 +437,7 @@ export default function OrderPipelinePage() {
                       <button onClick={() => window.print()} className="flex-1 bg-[#131C2F] hover:bg-slate-800 border border-slate-700 text-white font-bold py-3 rounded-lg text-sm flex items-center justify-center gap-2">
                         <Printer className="w-4 h-4" /> Slip
                       </button>
-                      <button onClick={() => handleUpdateOrder("DISPATCHED")} disabled={processing} className="flex-[2] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg text-sm">
+                      <button onClick={() => handleUpdateOrder("DISPATCHED")} disabled={processing} className="flex-[2] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg text-sm transition">
                         Dispatch
                       </button>
                     </div>
@@ -361,7 +450,7 @@ export default function OrderPipelinePage() {
                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Tracking Ref</p>
                       <p className="font-bold text-blue-400">{bookingRef || "N/A"}</p>
                     </div>
-                    <button onClick={() => window.print()} className="w-full bg-[#131C2F] hover:bg-slate-800 border border-slate-700 text-white font-bold py-3 rounded-lg text-sm flex items-center justify-center gap-2">
+                    <button onClick={() => window.print()} className="w-full bg-[#131C2F] hover:bg-slate-800 border border-slate-700 text-white font-bold py-3 rounded-lg text-sm flex items-center justify-center gap-2 transition">
                       <Printer className="w-4 h-4" /> Print Slip
                     </button>
                   </div>
@@ -372,9 +461,7 @@ export default function OrderPipelinePage() {
         )}
       </div>
 
-      {/* ============================================================== */}
-      {/* THERMAL PRINTER RECEIPT (Hidden on screen, shown in print)     */}
-      {/* ============================================================== */}
+      {/* THERMAL PRINTER RECEIPT (Hidden on screen, shown in print) */}
       {activeOrder && (
         <div className="print-only font-mono text-[12px] leading-tight text-black bg-white w-full mx-auto p-1 uppercase">
           <div className="text-center font-bold">================================</div>
@@ -428,38 +515,21 @@ export default function OrderPipelinePage() {
       )}
 
       <style dangerouslySetInnerHTML={{__html: `
-        /* Autofill override to prevent Chrome from turning inputs white */
-        input:-webkit-autofill,
-        input:-webkit-autofill:hover, 
-        input:-webkit-autofill:focus, 
-        input:-webkit-autofill:active{
+        input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, input:-webkit-autofill:active{
             -webkit-box-shadow: 0 0 0 30px #0B1121 inset !important;
             -webkit-text-fill-color: #e2e8f0 !important;
         }
-
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.4); border-radius: 8px; }
         .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.8); }
-        
         .print-only { display: none; }
-
         @media print {
           @page { margin: 0; size: 80mm auto; }
-          
           body * { visibility: hidden; }
-          
-          .print-only, .print-only * {
-            visibility: visible;
-          }
-          
+          .print-only, .print-only * { visibility: visible; }
           .print-only {
-            display: block !important;
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 80mm;
-            padding: 2mm;
+            display: block !important; position: absolute; left: 0; top: 0; width: 80mm; padding: 2mm;
           }
         }
       `}} />
