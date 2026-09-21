@@ -1,6 +1,5 @@
-import { PrismaClient } from "@/app/generated/prisma/client";
+import { prisma } from "@/app/lib/prisma";
 
-const prisma = new PrismaClient();
 
 interface TransactionLine {
   accountId: string;
