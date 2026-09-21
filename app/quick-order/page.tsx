@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Search, Plus, PackageOpen, Truck, ChevronRight, CheckCircle2, Printer } from "lucide-react";
+import { Search, Plus, PackageOpen, Truck, CheckCircle2, Printer, Trash2, Edit } from "lucide-react";
 
 export default function OrderPipelinePage() {
   const [view, setView] = useState<"list" | "create" | "manage">("list");
@@ -19,6 +19,7 @@ export default function OrderPipelinePage() {
   
   const [activeOrder, setActiveOrder] = useState<any>(null);
   const [allocations, setAllocations] = useState<Record<string, string>>({});
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   
   const [courierName, setCourierName] = useState("TCS");
   const [bookingRef, setBookingRef] = useState("");
@@ -80,6 +81,54 @@ export default function OrderPipelinePage() {
     } catch (e) { alert("Network error."); } finally { setProcessing(false); }
   };
 
+  const handleDeleteOrder = async (id: string) => {
+    if (!confirm("Are you sure you want to cancel and delete this order?")) return;
+    try {
+      const res = await fetch(`/api/orders?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setOrders(orders.filter(o => o.id !== id));
+      } else {
+        alert("Failed to delete order.");
+      }
+    } catch (e) { alert("Network error."); }
+  };
+
+  const handleBulkGenerate = async () => {
+    if (selectedOrders.length === 0) return;
+    if (!confirm(`Auto-allocate and generate ${selectedOrders.length} orders?`)) return;
+
+    setProcessing(true);
+    for (const id of selectedOrders) {
+      const order = orders.find(o => o.id === id);
+      if (!order) continue;
+
+      const autoAllocations: Record<string, string> = {};
+      order.lines.forEach((line: any) => { autoAllocations[line.id] = "AUTO"; });
+
+      try {
+        await fetch("/api/orders/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: order.id,
+            allocations: autoAllocations,
+            courierName: "",
+            bookingRef: "",
+            deliveryFee: 0,
+            paymentStatus: "PENDING"
+          })
+        });
+      } catch (e) {
+        console.error(`Failed to generate order ${order.orderNumber}`);
+      }
+    }
+    
+    alert("Bulk generation complete.");
+    setSelectedOrders([]);
+    await fetchPipelineData();
+    setProcessing(false);
+  };
+
   const handleUpdateOrder = async (targetStatus: string) => {
     if (targetStatus === "DISPATCHED" && !bookingRef) return alert("Please enter tracking reference.");
     setProcessing(true);
@@ -123,7 +172,7 @@ export default function OrderPipelinePage() {
       });
       const data = await res.json();
       if (data.success) {
-        alert("Order generated, stock deducted, and invoice created!");
+        alert("Order generated and stock reserved!");
         await fetchPipelineData();
         setView("list");
         setActiveOrder(null);
@@ -135,8 +184,6 @@ export default function OrderPipelinePage() {
 
   const openManage = (order: any) => {
     setActiveOrder(order);
-    
-    // Pre-fill allocations with "AUTO"
     const initialAllocations: Record<string, string> = {};
     order.lines.forEach((line: any) => {
       initialAllocations[line.id] = "AUTO";
@@ -167,7 +214,6 @@ export default function OrderPipelinePage() {
     <>
       <div className="no-print min-h-screen bg-[#0B1121] text-slate-200 p-6 font-sans">
         
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white">Order Pipeline</h1>
@@ -192,7 +238,7 @@ export default function OrderPipelinePage() {
               {tabs.map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => { setActiveTab(tab.id); setSelectedOrders([]); }}
                   className={`px-4 py-3 text-sm font-bold whitespace-nowrap border-b-2 transition-all ${
                     activeTab === tab.id ? "border-blue-500 text-blue-400 bg-blue-500/5" : "border-transparent text-slate-500 hover:text-slate-300"
                   }`}
@@ -202,33 +248,87 @@ export default function OrderPipelinePage() {
               ))}
             </div>
 
-            <div className="grid gap-4">
-              {filteredOrders.length === 0 ? (
-                <div className="bg-[#131C2F] rounded-2xl border border-slate-800/60 p-12 flex flex-col items-center justify-center text-slate-500">
-                  <PackageOpen className="w-12 h-12 mb-4 opacity-50" />
-                  <p>No orders currently in this stage.</p>
-                </div>
-              ) : (
-                filteredOrders.map(order => (
-                  <div key={order.id} className="bg-[#131C2F] rounded-xl border border-slate-800/60 p-5 flex items-center justify-between hover:border-slate-600 transition-colors cursor-pointer" onClick={() => openManage(order)}>
-                    <div>
-                      <h3 className="font-bold text-white text-lg">{order.orderNumber}</h3>
-                      {activeTab === "DISPATCHED" && order.bookingNumber && (
-                        <p className="text-xs font-bold text-blue-400 mt-1 uppercase tracking-wider">Ref: {order.bookingNumber}</p>
-                      )}
-                      <p className="text-sm text-slate-400 mt-1">{order.customer?.name} • {order.lines.length} items</p>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <div className="text-right hidden md:block">
-                        <p className="text-xs text-slate-500 uppercase tracking-wider">Total Value</p>
-                        <p className="font-bold text-emerald-400">{formatCurrency(Number(order.totalAmount))}</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-600" />
-                    </div>
+            {filteredOrders.length === 0 ? (
+              <div className="bg-[#131C2F] rounded-2xl border border-slate-800/60 p-12 flex flex-col items-center justify-center text-slate-500">
+                <PackageOpen className="w-12 h-12 mb-4 opacity-50" />
+                <p>No orders currently in this stage.</p>
+              </div>
+            ) : (
+              <div className="bg-[#131C2F] rounded-xl border border-slate-800/60 overflow-hidden">
+                {/* BULK ACTION BAR */}
+                {activeTab === "SALE_ORDER" && selectedOrders.length > 0 && (
+                  <div className="bg-blue-900/20 p-4 flex justify-between items-center border-b border-slate-800/60">
+                    <span className="text-sm font-bold text-blue-400">{selectedOrders.length} orders selected</span>
+                    <button 
+                      onClick={handleBulkGenerate}
+                      disabled={processing}
+                      className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition"
+                    >
+                      {processing ? "Generating..." : "Confirm All (Auto-Allocate)"}
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-[#0B1121] text-slate-500 text-[11px] uppercase tracking-wider">
+                      <tr>
+                        {activeTab === "SALE_ORDER" && (
+                          <th className="p-4 w-12 text-center">
+                            <input 
+                              type="checkbox" 
+                              className="accent-blue-500 w-4 h-4 rounded"
+                              checked={selectedOrders.length === filteredOrders.length}
+                              onChange={(e) => e.target.checked ? setSelectedOrders(filteredOrders.map(o => o.id)) : setSelectedOrders([])}
+                            />
+                          </th>
+                        )}
+                        <th className="p-4 font-semibold">Order #</th>
+                        <th className="p-4 font-semibold">Customer</th>
+                        <th className="p-4 font-semibold text-center">Items</th>
+                        <th className="p-4 font-semibold text-right">Total</th>
+                        <th className="p-4 font-semibold text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {filteredOrders.map(order => (
+                        <tr key={order.id} className="hover:bg-slate-800/20 transition group">
+                          {activeTab === "SALE_ORDER" && (
+                            <td className="p-4 text-center">
+                              <input 
+                                type="checkbox" 
+                                className="accent-blue-500 w-4 h-4 rounded"
+                                checked={selectedOrders.includes(order.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedOrders([...selectedOrders, order.id]);
+                                  else setSelectedOrders(selectedOrders.filter(id => id !== order.id));
+                                }}
+                              />
+                            </td>
+                          )}
+                          <td className="p-4 font-bold text-white">{order.orderNumber}</td>
+                          <td className="p-4 text-slate-300">{order.customer?.name}</td>
+                          <td className="p-4 text-center text-slate-400">{order.lines.length}</td>
+                          <td className="p-4 text-right font-bold text-emerald-400">{formatCurrency(Number(order.totalAmount))}</td>
+                          <td className="p-4 text-center">
+                            <div className="flex items-center justify-center gap-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => openManage(order)} className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-xs font-bold uppercase tracking-wider">
+                                <Edit className="w-3 h-3" /> View/Edit
+                              </button>
+                              {activeTab === "SALE_ORDER" && (
+                                <button onClick={() => handleDeleteOrder(order.id)} className="text-red-400 hover:text-red-300 flex items-center gap-1 text-xs font-bold uppercase tracking-wider">
+                                  <Trash2 className="w-3 h-3" /> Cancel
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -282,7 +382,7 @@ export default function OrderPipelinePage() {
                   <span className="text-slate-400 font-medium">Draft Total</span>
                   <span className="text-xl font-black text-white">{formatCurrency(subtotal)}</span>
                 </div>
-                <button onClick={handleCreateOrder} disabled={processing} className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl">
+                <button onClick={handleCreateOrder} disabled={processing} className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
                   {processing ? "Saving..." : "Save Draft Order"}
                 </button>
               </div>
@@ -305,7 +405,6 @@ export default function OrderPipelinePage() {
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
               
-              {/* ORDER ITEMS & ALLOCATION MATRIX */}
               <div>
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
                   {activeOrder.status === "SALE_ORDER" ? "Batch Allocation" : "Order Items"}
@@ -367,7 +466,6 @@ export default function OrderPipelinePage() {
                 )}
               </div>
 
-              {/* PROCESSING ACTIONS */}
               <div className="bg-[#0B1121] p-6 rounded-xl border border-slate-800 h-fit">
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                   <Truck className="w-4 h-4" /> Processing Actions
@@ -461,7 +559,6 @@ export default function OrderPipelinePage() {
         )}
       </div>
 
-      {/* THERMAL PRINTER RECEIPT (Hidden on screen, shown in print) */}
       {activeOrder && (
         <div className="print-only font-mono text-[12px] leading-tight text-black bg-white w-full mx-auto p-1 uppercase">
           <div className="text-center font-bold">================================</div>

@@ -6,7 +6,6 @@ export async function GET() {
     const company = await prisma.company.findFirst();
     if (!company) return NextResponse.json({ success: false, error: "No master company found." });
 
-    // 1. Fetch Orders with nested Stock Batches for the Allocation Matrix
     const orders = await prisma.order.findMany({
       where: { companyId: company.id },
       include: {
@@ -28,13 +27,11 @@ export async function GET() {
       orderBy: { createdAt: "desc" }
     });
 
-    // 2. Fetch data for the manual "Create Order" tab
     const customers = await prisma.customer.findMany({ where: { companyId: company.id } });
     const products = await prisma.product.findMany({ where: { companyId: company.id, type: "GOODS" } });
 
     return NextResponse.json({ success: true, orders, customers, products, company });
   } catch (error: any) {
-    console.error("GET Orders Error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -85,6 +82,19 @@ export async function PUT(req: Request) {
       }
     });
     return NextResponse.json({ success: true, order: updated });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    if (!id) return NextResponse.json({ success: false, error: "Missing ID" });
+    
+    await prisma.order.delete({ where: { id } });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
