@@ -1,10 +1,10 @@
-export const dynamic = 'force-dynamic';
 "use client";
+import { Suspense } from "react";
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function UnauthorizedPage() {
+function UnauthorizedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetPath = searchParams.get("target") || "/dashboard";
@@ -88,5 +88,13 @@ export default function UnauthorizedPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UnauthorizedPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading...</div>}>
+      <UnauthorizedContent />
+    </Suspense>
   );
 }
