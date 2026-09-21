@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
+  const route = request.nextUrl.pathname;
+  // EXPLICIT PUBLIC ROUTES
+  if (route === '/shop' || route === '/api/shop/checkout') return NextResponse.next();
+  // EVERYTHING ELSE (including /shop/admin) FALLS THROUGH TO ERP AUTHENTICATION
+
   if (request.nextUrl.pathname === '/shop' || request.nextUrl.pathname.startsWith('/api/shop/checkout')) return NextResponse.next();
 
   const { pathname } = request.nextUrl;
@@ -65,6 +70,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!shop|api/shop/checkout|_next/static|_next/image|favicon.ico|public).*)",
+    "/((?!_next/static|_next/image|favicon.ico|public).*)",
   ],
 };
