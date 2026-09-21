@@ -3,14 +3,15 @@ import { v2 as cloudinary } from "cloudinary";
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
-      return NextResponse.json({ error: "Cloudinary keys are missing in Environment Variables." }, { status: 500 });
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return NextResponse.json({ error: "Cloudinary keys are missing." }, { status: 500 });
     }
 
+    // .trim() aggressively destroys any invisible spaces or newlines copied into Vercel
     cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME.trim(),
+      api_key: process.env.CLOUDINARY_API_KEY.trim(),
+      api_secret: process.env.CLOUDINARY_API_SECRET.trim(),
     });
 
     const formData = await req.formData();
