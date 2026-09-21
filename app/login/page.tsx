@@ -1,78 +1,204 @@
 ﻿"use client";
-import { useState } from "react";
+
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError("");
+
+    if (!email.trim() || !password) {
+      setError("Please enter your email and password.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+        }),
       });
-      
-      const data = await res.json();
 
-      if (res.ok) {
-        router.push("/dashboard");
-        router.refresh();
-      } else {
-        setError(data.error || "Invalid credentials.");
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Unable to sign in.");
+        return;
       }
-    } catch (err) {
+
+      router.replace("/");
+      router.refresh();
+    } catch {
       setError("Unable to connect to the server.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-[#0B1121] flex items-center justify-center p-4 font-sans selection:bg-blue-500/30">
-      <div className="max-w-sm w-full bg-[#131C2F] border border-slate-800/60 rounded-xl shadow-2xl p-6">
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center shadow-lg mb-3">
-            <span className="text-lg font-black text-white tracking-wider">IB</span>
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#0B1121",
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "360px",
+          background: "#131C2F",
+          border: "1px solid rgba(30, 41, 59, 0.6)",
+          borderRadius: "14px",
+          padding: "30px",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+        }}
+      >
+        <div style={{ marginBottom: "24px", textAlign: "center" }}>
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "10px",
+              background: "linear-gradient(to bottom right, #2563eb, #1e40af)",
+              color: "#ffffff",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "20px",
+              fontWeight: 900,
+              marginBottom: "12px",
+              boxShadow: "0 4px 14px 0 rgba(37, 99, 235, 0.39)",
+            }}
+          >
+            IB
           </div>
-          <h1 className="text-lg font-bold text-white tracking-wide">Izan Bling ERP</h1>
+
+          <h1
+            style={{
+              margin: 0,
+              color: "#ffffff",
+              fontSize: "22px",
+              fontWeight: 800,
+            }}
+          >
+            Izan Bling ERP
+          </h1>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Email</label>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: "16px" }}>
+            <label
+              htmlFor="email"
+              style={{
+                display: "block",
+                marginBottom: "6px",
+                color: "#94a3b8",
+                fontSize: "11px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              Email
+            </label>
+
             <input
+              id="email"
               type="email"
-              required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-white text-slate-900 font-medium border border-slate-300 rounded p-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder-slate-400 shadow-sm"
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="Enter your email"
+              autoComplete="email"
+              disabled={loading}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                height: "42px",
+                padding: "0 12px",
+                border: "1px solid #334155",
+                borderRadius: "6px",
+                outline: "none",
+                color: "#0f172a",
+                background: "#ffffff",
+                fontSize: "14px",
+                fontWeight: 500,
+              }}
             />
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password</label>
+          <div style={{ marginBottom: "20px" }}>
+            <label
+              htmlFor="password"
+              style={{
+                display: "block",
+                marginBottom: "6px",
+                color: "#94a3b8",
+                fontSize: "11px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              Password
+            </label>
+
             <input
+              id="password"
               type="password"
-              required
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white text-slate-900 font-medium border border-slate-300 rounded p-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder-slate-400 shadow-sm"
+              onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"
+              autoComplete="current-password"
+              disabled={loading}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                height: "42px",
+                padding: "0 12px",
+                border: "1px solid #334155",
+                borderRadius: "6px",
+                outline: "none",
+                color: "#0f172a",
+                background: "#ffffff",
+                fontSize: "14px",
+                fontWeight: 500,
+              }}
             />
           </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-2 rounded text-center font-medium">
+            <div
+              style={{
+                marginBottom: "16px",
+                padding: "10px 12px",
+                borderRadius: "6px",
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid rgba(239, 68, 68, 0.2)",
+                color: "#f87171",
+                fontSize: "12px",
+                fontWeight: 500,
+                textAlign: "center",
+              }}
+            >
               {error}
             </div>
           )}
@@ -80,12 +206,25 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-2.5 rounded text-xs transition-all mt-2 uppercase tracking-wider shadow-md"
+            style={{
+              width: "100%",
+              height: "42px",
+              border: "none",
+              borderRadius: "6px",
+              background: loading ? "#60a5fa" : "#2563eb",
+              color: "#ffffff",
+              fontSize: "13px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              cursor: loading ? "not-allowed" : "pointer",
+              boxShadow: "0 4px 14px 0 rgba(37, 99, 235, 0.2)",
+            }}
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }
