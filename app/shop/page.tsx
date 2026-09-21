@@ -1,5 +1,6 @@
 ﻿import { prisma } from "@/app/lib/prisma";
 import Link from "next/link";
+import ShopNavbar from "@/app/components/ShopNavbar";
 
 export const dynamic = "force-dynamic";
 
@@ -10,23 +11,17 @@ export default async function ShopPage() {
   });
 
   const displayProducts = products.length > 0 ? products : [
-    { id: '1', name: 'Classic Gold Chain', salePrice: 12000, imageUrl: 'https://placehold.co/400x400?text=Gold+Chain' },
-    { id: '2', name: 'Diamond Stud Earrings', salePrice: 35000, imageUrl: 'https://placehold.co/400x400?text=Earrings' },
-    { id: '3', name: 'Silver Tennis Bracelet', salePrice: 21000, imageUrl: 'https://placehold.co/400x400?text=Bracelet' },
-    { id: '4', name: 'Vintage Pearl Ring', salePrice: 18000, imageUrl: 'https://placehold.co/400x400?text=Pearl+Ring' },
+    { id: '1', name: 'Classic Gold Chain', salePrice: 12000, imageUrl: 'https://placehold.co/400x400?text=Gold+Chain' }
   ];
 
   return (
     <div className="fixed inset-0 z-[100] bg-white overflow-y-auto flex flex-col font-sans text-gray-900">
-      <header className="flex justify-between items-center p-8 border-b">
-        <Link href="/shop" className="text-2xl tracking-widest uppercase">Izan Bling</Link>
-        <Link href="/shop/checkout" className="text-sm uppercase tracking-wide hover:text-gray-500 transition">Cart / Checkout</Link>
-      </header>
+      <ShopNavbar />
 
       <main className="flex-grow p-8 max-w-7xl mx-auto w-full flex flex-col">
         <div className="text-center mb-16 mt-8">
           <h2 className="text-4xl font-light mb-4">The Collection</h2>
-          <p className="text-gray-500 text-sm">Explore our latest aesthetic arrivals. Minimalist design crafted for maximum elegance.</p>
+          <p className="text-gray-500 text-sm">Explore our latest aesthetic arrivals.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-24">
@@ -41,7 +36,7 @@ export default async function ShopPage() {
           ))}
         </div>
 
-        {/* RESTORED CONTACT FORM AND FOOTER */}
+        {/* FOOTER & CONTACT */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 border-t pt-16 mt-auto">
            <div>
              <h3 className="text-sm tracking-widest uppercase mb-6">Contact Us</h3>
@@ -57,11 +52,9 @@ export default async function ShopPage() {
                <h3 className="text-sm tracking-widest uppercase mb-6">Follow Us</h3>
                <div className="flex flex-col space-y-2 text-sm text-gray-500">
                  <a href="#" className="hover:text-gray-900 transition">Instagram</a>
-                 <a href="#" className="hover:text-gray-900 transition">Pinterest</a>
-                 <a href="#" className="hover:text-gray-900 transition">Twitter</a>
                </div>
              </div>
-             <p className="text-xs text-gray-400 mt-16">&copy; 2026 Izan Bling. All rights reserved.</p>
+             <p className="text-xs text-gray-400 mt-16">&copy; 2026 Izan Bling.</p>
            </div>
         </div>
       </main>
