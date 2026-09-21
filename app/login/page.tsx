@@ -55,7 +55,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-[#0B1121] text-white border border-slate-700 rounded p-2 text-sm focus:border-blue-500 outline-none transition-all placeholder-slate-700"
-              placeholder="admin@izan.com"
+              placeholder="Enter your email"
             />
           </div>
 
@@ -88,14 +88,13 @@ export default function LoginPage() {
       </div>
       
       <style dangerouslySetInnerHTML={{__html: `
-        /* Overrides Chrome's aggressive white autofill styling */
+        /* Bulletproof fix for Chrome autofill white background */
         input:-webkit-autofill,
         input:-webkit-autofill:hover, 
         input:-webkit-autofill:focus, 
-        input:-webkit-autofill:active{
-            -webkit-box-shadow: 0 0 0 30px #0B1121 inset !important;
+        input:-webkit-autofill:active {
+            transition: background-color 5000s ease-in-out 0s !important;
             -webkit-text-fill-color: #ffffff !important;
-            color: #ffffff !important;
         }
       `}} />
     </div>
