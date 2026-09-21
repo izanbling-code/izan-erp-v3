@@ -1,5 +1,5 @@
 import { prisma } from "@/app/lib/prisma";
-import { AccountType } from "@/app/generated/prisma/client";
+import { AccountType } from "@prisma/client";
 
 export async function getHierarchicalBalances(companyId: string) {
   // 1. Fetch all active accounts and their POSTED journal lines

@@ -36,7 +36,7 @@ export default function CashBookReport() {
   const formatCurrency = (amt: number) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(Math.abs(amt));
 
   return (
-    <ERPShell>
+    <ERPShell title="Cash Book Register">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         
         <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">
@@ -97,7 +97,7 @@ export default function CashBookReport() {
                       </td>
                       <td className="py-3 px-4 font-mono text-xs font-bold text-indigo-700">{row.voucherId}</td>
                       <td className="py-3 px-4 text-gray-600 text-xs truncate max-w-[200px]">{row.description}</td>
-                      <td className={`py-3 px-4 text-right font-bold ${row.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                      <td className={`py-3 px-4 text-right font-bold ${row.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {row.amount >= 0 ? "" : "-"} {formatCurrency(row.amount)}
                       </td>
                       <td className="py-3 px-4 text-right font-bold text-gray-900">{formatCurrency(row.balance)}</td>

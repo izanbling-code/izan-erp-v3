@@ -43,7 +43,7 @@ export default function CashDepositReport() {
   const totalDeposits = data.reduce((sum, row) => sum + Number(row.amount), 0);
 
   return (
-    <ERPShell>
+    <ERPShell title="Cash Deposit Report">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         
         {/* HEADER SECTION */}

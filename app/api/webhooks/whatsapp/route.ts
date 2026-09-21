@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@/app/generated/prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     }
 
     // 4. ACID Transaction: Generate sequence and save the Order
-    const order = await prisma.$transaction(async (tx: any) => {
+    const order = await prisma.$transaction(async (tx) => {
       // Note: sequenceCounter still uses 'tenantId' in the schema, so we map companyId to it
       const counter = await tx.sequenceCounter.upsert({
         where: { tenantId_model: { tenantId: companyId, model: "Order" } },

@@ -136,7 +136,7 @@ export default function DedicatedReportPage({ params }: { params: Promise<{ type
   }, [rows, search, visibleKeys]);
 
   return (
-    <ERPShell>
+    <ERPShell title={meta.title}>
       {/* Print isolation rules */}
       <style jsx global>{`
         @media print {

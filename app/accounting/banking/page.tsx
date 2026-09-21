@@ -83,7 +83,7 @@ export default function BankDirectoryPage() {
   const totalLiquidity = accounts.filter(a => a.isActive).reduce((sum, acc) => sum + acc.totalBookBalance, 0);
 
   return (
-    <ERPShell>
+    <ERPShell title="Bank Directory">
       <div className="max-w-6xl mx-auto p-6 space-y-5 text-sm">
         
         {/* Sleek Header & Minimal Summary Widget */}
@@ -125,7 +125,7 @@ export default function BankDirectoryPage() {
                 <tr><td colSpan={5} className="py-8 text-center text-gray-400">No bank accounts registered.</td></tr>
               ) : (
                 accounts.map((acc) => (
-                  <tr key={acc.id} className={`hover:bg-gray-50/50 transition ${!acc.isActive ? "opacity-60 bg-gray-50" : ""}>
+                  <tr key={acc.id} className={`hover:bg-gray-50/50 transition ${!acc.isActive ? "opacity-60 bg-gray-50" : ""}`}>
                     <td className="py-3 px-4">
                       <div className="font-bold text-gray-900">{acc.bankName}</div>
                       <div className="text-xs text-gray-500 mt-0.5">{acc.accountTitle}</div>
@@ -149,8 +149,8 @@ export default function BankDirectoryPage() {
                         <Link href={`/accounting/banking/${acc.id}`} className="bg-white border border-gray-200 hover:border-gray-300 text-gray-800 font-semibold py-1.5 px-3 rounded-lg text-xs transition shadow-sm">
                           Manage
                         </Link>
-                        <button onClick={() => openEditModal(acc)} className="p-1.5 text-gray-400 hover:text-blue-600 transition">✏️</button>
-                        <button onClick={() => handleDeleteBank(acc)} className="p-1.5 text-gray-400 hover:text-rose-600 transition">🗑️</button>
+                        <button onClick={() => openEditModal(acc)} className="p-1.5 text-gray-400 hover:text-blue-600 transition" title="Edit">✏️</button>
+                        <button onClick={() => handleDeleteBank(acc)} className="p-1.5 text-gray-400 hover:text-rose-600 transition" title="Delete">🗑️</button>
                       </div>
                     </td>
                   </tr>
