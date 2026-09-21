@@ -8,7 +8,6 @@ export const dynamic = "force-dynamic";
 export default async function ProductPage({ params }: { params: { id: string } }) {
   let product = null;
 
-  // SAFEGUARD: Intercept dummy items so they don't crash Prisma
   if (["1", "2", "3", "4"].includes(params.id)) {
     const dummies = [
       { id: '1', name: 'Classic Gold Chain', sku: 'DUMMY-01', salePrice: 12000, description: 'A beautiful classic gold chain.', imageUrl: 'https://placehold.co/600x600?text=Gold+Chain' },
@@ -18,7 +17,6 @@ export default async function ProductPage({ params }: { params: { id: string } }
     ];
     product = dummies.find(d => d.id === params.id);
   } else {
-    // If it's a real ID, fetch from Prisma
     try {
       product = await prisma.product.findUnique({ where: { id: params.id } });
     } catch (error) {
