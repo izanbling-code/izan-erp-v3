@@ -54,7 +54,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-[#0B1121] text-white border border-slate-700 rounded p-2 text-sm focus:border-blue-500 outline-none transition-all placeholder-slate-700"
+              className="w-full bg-white text-slate-900 font-medium border border-slate-300 rounded p-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder-slate-400 shadow-sm"
               placeholder="Enter your email"
             />
           </div>
@@ -66,7 +66,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#0B1121] text-white border border-slate-700 rounded p-2 text-sm focus:border-blue-500 outline-none transition-all placeholder-slate-700"
+              className="w-full bg-white text-slate-900 font-medium border border-slate-300 rounded p-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder-slate-400 shadow-sm"
               placeholder="••••••••"
             />
           </div>
@@ -80,23 +80,12 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-2 rounded text-xs transition-all mt-2 uppercase tracking-wider"
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-2.5 rounded text-xs transition-all mt-2 uppercase tracking-wider shadow-md"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
       </div>
-      
-      <style dangerouslySetInnerHTML={{__html: `
-        /* Bulletproof fix for Chrome autofill white background */
-        input:-webkit-autofill,
-        input:-webkit-autofill:hover, 
-        input:-webkit-autofill:focus, 
-        input:-webkit-autofill:active {
-            transition: background-color 5000s ease-in-out 0s !important;
-            -webkit-text-fill-color: #ffffff !important;
-        }
-      `}} />
     </div>
   );
 }
