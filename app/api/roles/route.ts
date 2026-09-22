@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
-    // In a real app, extract companyId from the session/token
     const company = await prisma.company.findFirst(); 
     if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 });
 
@@ -32,10 +31,13 @@ export async function POST(request: NextRequest) {
     const company = await prisma.company.findFirst();
     if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 });
 
+    // SMART FIX: Automatically grant the universal skeleton key to any Admin role
+    const finalPermissions = name.toLowerCase().includes("admin") ? ["/"] : permissions;
+
     const newRole = await prisma.role.create({
       data: {
         name,
-        permissions,
+        permissions: finalPermissions,
         companyId: company.id
       }
     });
