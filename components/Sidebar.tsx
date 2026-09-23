@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -8,7 +8,8 @@ import {
   ShoppingBag, Truck, Receipt,
   Package, Layers, ArrowRightLeft,
   BookOpen, Landmark, BookMarked, Wallet,
-  BarChart3, Calendar, Settings, Shield, Server
+  BarChart3, Calendar, Settings, Shield, Server,
+  LogOut
 } from "lucide-react";
 
 const menuGroups = [
@@ -119,16 +120,23 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-slate-800/60 shrink-0">
+      <div className="p-4 border-t border-slate-800/60 shrink-0 space-y-3">
         <div className="bg-[#131C2F] p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 font-bold shrink-0">
             A
           </div>
-          <div className="overflow-hidden">
+          <div className="overflow-hidden flex-1">
             <p className="text-sm font-bold text-white truncate">Admin User</p>
             <p className="text-xs text-slate-500 truncate">admin@izan.com</p>
           </div>
         </div>
+        <a 
+          href="/api/auth/logout"
+          className="flex items-center justify-center gap-2 w-full bg-[#131C2F] hover:bg-red-500/10 border border-slate-800 hover:border-red-500/30 text-slate-400 hover:text-red-400 px-4 py-2.5 rounded-lg text-sm font-bold transition-all"
+        >
+          <LogOut className="w-4 h-4" />
+          Log Out
+        </a>
       </div>
       
       <style dangerouslySetInnerHTML={{__html: `
