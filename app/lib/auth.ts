@@ -19,7 +19,8 @@ export async function authenticate(request: NextRequest, requiredPermission?: st
   
   const session = await prisma.session.findFirst({
     where: { token, expiresAt: { gt: new Date() } },
-    include: { user: { include: { role: { include: { permissions: { include: { permission: true } } } } } } }
+    // SMART FIX: Updated to match your schema's "rolePermissions" relation name
+    include: { user: { include: { role: { include: { rolePermissions: { include: { permission: true } } } } } } }
   });
   
   if (!session || !session.user) return null;
@@ -32,7 +33,8 @@ export async function authenticate(request: NextRequest, requiredPermission?: st
   if (roleName === "ADMIN" || roleName === "ADMINISTRATOR") return user;
   
   if (requiredPermission) {
-    const permissions = user.role?.permissions.map((rp: any) => rp.permission.action) || [];
+    // Check against the correctly named rolePermissions array
+    const permissions = user.role?.rolePermissions?.map((rp: any) => rp.permission.action) || [];
     if (!permissions.includes(requiredPermission)) return null;
   }
   return user; 
