@@ -10,8 +10,8 @@ type PurchaseBill = {
   billNo: string;
   billDate: string;
   status: "DRAFT" | "POSTED" | "PARTIAL" | "PAID" | "VOID";
-  total: number;
-  balance: number;
+  total: number | string;
+  balance: number | string;
   supplier: { name: string; };
   lines: any[];
 };
@@ -138,14 +138,15 @@ export default function PurchaseBillsPage() {
     }));
   }
 
-  // Calculate Net Values
+  // FIXED MATH ENGINE: Force all values to strict Numbers to prevent string concatenation
   const itemsSubtotal = useMemo(() => allocLines.reduce((sum, l) => sum + (Number(l.totalCost) || 0), 0), [allocLines]);
   const calcDiscount = discountType === "PERCENT" ? (itemsSubtotal * (Number(discountVal) || 0)) / 100 : (Number(discountVal) || 0);
   const calcAdjustment = Number(adjustmentVal) || 0;
   const calcDelivery = Number(deliveryCharges) || 0;
   
+  // STRCT NUMBER CASTING FIX
+  const targetTotal = Number(allocatingBill?.total || 0);
   const netAllocated = itemsSubtotal - calcDiscount + calcAdjustment + calcDelivery;
-  const targetTotal = allocatingBill?.total || 0;
   const balanceRemaining = targetTotal - netAllocated;
 
   function autoDistributeCosts() {
