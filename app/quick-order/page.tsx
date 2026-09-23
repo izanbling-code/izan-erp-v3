@@ -18,9 +18,9 @@ export default function OrderPipelinePage() {
   const [cart, setCart] = useState<any[]>([]);
   
   const [activeOrder, setActiveOrder] = useState<any>(null);
-  const [viewingOrder, setViewingOrder] = useState<any>(null); // For the read-only View modal
+  const [viewingOrder, setViewingOrder] = useState<any>(null);
   
-  const [editLines, setEditLines] = useState<any[]>([]); // For the mini invoice editor
+  const [editLines, setEditLines] = useState<any[]>([]);
   const [allocations, setAllocations] = useState<Record<string, string>>({});
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   
@@ -151,8 +151,8 @@ export default function OrderPipelinePage() {
           id: activeOrder.id, 
           status: targetStatus, 
           bookingNumber: combinedTracking,
-          courierName: courierName, // Passed separately for invoice parsing
-          trackingNumber: bookingRef, // Passed separately for invoice parsing
+          courierName: courierName,
+          trackingNumber: bookingRef,
           deliveryCharges: Number(deliveryFee) || 0,
           paymentStatus: paymentStatus
         })
@@ -196,8 +196,6 @@ export default function OrderPipelinePage() {
 
   const openManage = (order: any) => {
     setActiveOrder(order);
-    
-    // Setup for mini-invoice editor
     setEditLines(order.lines.map((l: any) => ({
       id: l.id,
       productId: l.productId,
@@ -234,7 +232,6 @@ export default function OrderPipelinePage() {
   return (
     <>
       <div className="no-print min-h-screen bg-[#0B1121] text-slate-200 p-6 font-sans relative">
-        
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white">Order Pipeline</h1>
@@ -290,11 +287,11 @@ export default function OrderPipelinePage() {
                 )}
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-[#0B1121] text-slate-500 text-[11px] uppercase tracking-wider">
+                  <table className="w-full text-left text-sm whitespace-nowrap !bg-[#131C2F]">
+                    <thead className="!bg-[#0B1121] !text-slate-400 text-[11px] uppercase tracking-wider">
                       <tr>
                         {activeTab === "SALE_ORDER" && (
-                          <th className="p-4 w-12 text-center">
+                          <th className="p-4 w-12 text-center !border-b !border-slate-800">
                             <input 
                               type="checkbox" 
                               className="accent-blue-500 w-4 h-4 rounded"
@@ -303,16 +300,16 @@ export default function OrderPipelinePage() {
                             />
                           </th>
                         )}
-                        <th className="p-4 font-semibold">Order #</th>
-                        <th className="p-4 font-semibold">Customer</th>
-                        <th className="p-4 font-semibold text-center">Items</th>
-                        <th className="p-4 font-semibold text-right">Total</th>
-                        <th className="p-4 font-semibold text-center">Actions</th>
+                        <th className="p-4 font-semibold !border-b !border-slate-800">Order #</th>
+                        <th className="p-4 font-semibold !border-b !border-slate-800">Customer</th>
+                        <th className="p-4 font-semibold text-center !border-b !border-slate-800">Items</th>
+                        <th className="p-4 font-semibold text-right !border-b !border-slate-800">Total</th>
+                        <th className="p-4 font-semibold text-center !border-b !border-slate-800">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/50">
+                    <tbody className="!divide-y !divide-slate-800/50">
                       {filteredOrders.map(order => (
-                        <tr key={order.id} className="hover:bg-slate-800/20 transition group">
+                        <tr key={order.id} className="!bg-[#131C2F] hover:!bg-[#1e293b] transition-colors group">
                           {activeTab === "SALE_ORDER" && (
                             <td className="p-4 text-center">
                               <input 
@@ -326,10 +323,9 @@ export default function OrderPipelinePage() {
                               />
                             </td>
                           )}
-                          {/* FORCING TEXT COLORS HERE TO OVERRIDE INVISIBLE TEXT */}
                           <td className="p-4 font-bold !text-white">{order.orderNumber}</td>
-                          <td className="p-4 !text-slate-200">{order.customer?.name}</td>
-                          <td className="p-4 text-center !text-slate-300">{order.lines.length}</td>
+                          <td className="p-4 !text-slate-300">{order.customer?.name}</td>
+                          <td className="p-4 text-center !text-slate-400">{order.lines.length}</td>
                           <td className="p-4 text-right font-bold !text-emerald-400">{formatCurrency(Number(order.totalAmount))}</td>
                           <td className="p-4 text-center">
                             <div className="flex items-center justify-center gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
