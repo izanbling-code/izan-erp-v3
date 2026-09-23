@@ -7,6 +7,7 @@ type PurchaseLineInput = {
   productId: string;
   batchId?: string | null;
   batchNumber?: string | null;
+  uom?: string; // <-- Added UOM for the Gram Conversion Engine
   quantity: number;
   unitCost: number;
   discount?: number;
@@ -18,7 +19,7 @@ type PurchaseLineInput = {
 type PurchaseBillInput = {
   id?: string;
   supplierId: string;
-  billNo: string;
+  billNo?: string;
   billDate?: string;
   dueDate?: string | null;
   status?: "DRAFT" | "POSTED" | "PARTIAL" | "PAID" | "VOID";
@@ -148,10 +149,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as PurchaseBillInput;
     const supplierId = cleanString(body.supplierId);
-    const billNo = cleanString(body.billNo);
+    let billNo = cleanString(body.billNo);
 
     if (!supplierId) return NextResponse.json({ ok: false, error: "Supplier is required" }, { status: 400 });
-    if (!billNo) return NextResponse.json({ ok: false, error: "Bill number is required" }, { status: 400 });
     if (!Array.isArray(body.lines) || body.lines.length === 0) {
       return NextResponse.json({ ok: false, error: "At least one purchase item is required" }, { status: 400 });
     }
@@ -164,6 +164,26 @@ export async function POST(request: NextRequest) {
     });
     if (!supplier) return NextResponse.json({ ok: false, error: "Supplier not found" }, { status: 404 });
 
+    // DYNAMIC AUTO-NUMBERING
+    if (!billNo || billNo.toUpperCase() === "AUTO") {
+      const settings = await prisma.companySettings.findUnique({ where: { companyId: company.id } });
+      const prefix = (settings as any)?.purchaseBillPrefix || "PB-";
+      const startNum = (settings as any)?.purchaseBillStartingNumber || 1;
+
+      const latest = await prisma.purchaseBill.findFirst({
+        where: { companyId: company.id, billNo: { startsWith: prefix } },
+        orderBy: { createdAt: "desc" }
+      });
+
+      let nextNum = startNum;
+      if (latest && latest.billNo) {
+        const numPart = latest.billNo.substring(prefix.length);
+        const parsed = parseInt(numPart, 10);
+        if (!isNaN(parsed)) nextNum = parsed + 1;
+      }
+      billNo = `${prefix}${nextNum}`;
+    }
+
     const existingBill = await prisma.purchaseBill.findFirst({
       where: { companyId: company.id, billNo },
     });
@@ -171,9 +191,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: `Bill number ${billNo} already exists` }, { status: 409 });
     }
 
+    // THE GRAM CONVERSION ENGINE
     const lines = body.lines.map((line) => {
-      const quantity = decimalNumber(line.quantity);
-      const unitCost = decimalNumber(line.unitCost);
+      const isKG = line.uom === "KG";
+      const baseQty = decimalNumber(line.quantity);
+      const baseCost = decimalNumber(line.unitCost);
+
+      // Instantly convert KGs into Grams for the database
+      const quantity = isKG ? baseQty * 1000 : baseQty;
+      const unitCost = isKG ? baseCost / 1000 : baseCost;
+      
       const discount = decimalNumber(line.discount);
       const tax = decimalNumber(line.tax);
 
@@ -182,12 +209,17 @@ export async function POST(request: NextRequest) {
       if (quantity <= 0) throw new Error("Purchase quantity must be greater than zero");
       if (unitCost < 0) throw new Error("Purchase cost cannot be negative");
 
+      // Inject a visual note into the description so you remember how it was originally entered
+      const descPrefix = isKG ? `[Purchased as ${baseQty} KG @ Rs ${baseCost}/KG] ` : "";
+      const description = descPrefix + (cleanString(line.description) || "");
+
       return {
         ...line,
         quantity,
         unitCost,
         discount,
         tax,
+        description,
         total: quantity * unitCost - discount + tax,
       };
     });
@@ -256,7 +288,7 @@ export async function POST(request: NextRequest) {
         data: {
           companyId: company.id,
           supplierId: supplier.id,
-          billNo,
+          billNo: billNo!,
           billDate: parseDate(body.billDate),
           dueDate: body.dueDate ? parseDate(body.dueDate) : null,
           status,
@@ -461,6 +493,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ... PATCH and DELETE endpoints remain identical, keeping your transaction processing perfectly safe!
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
@@ -645,7 +678,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ ok: true, message: "Purchase bill posted successfully", bill: posted });
     }
 
-    // REVERSE WORKFLOW
     if (existing.status !== "POSTED" && existing.status !== "PARTIAL" && existing.status !== "PAID") {
       return NextResponse.json({ ok: false, error: `Bill cannot be reversed from status ${existing.status}` }, { status: 409 });
     }
