@@ -118,8 +118,8 @@ export async function PUT(req: Request) {
           data: {
             deliveryCharges: Number(body.deliveryCharges),
             total: Number(invoice.subtotal) + Number(body.deliveryCharges),
-            // Strictly formatted so your future web orders list can parse this easily
-            notes: `Order: ${updated.orderNumber} | Courier: ${body.courierName} | Tracking: ${body.trackingNumber} | Payment: ${body.paymentStatus}`
+            // Strictly formatted so your future web orders list can parse this easily. Prepending "Web Order | " ensures it routes to the correct tab.
+            notes: `Web Order | Order: ${updated.orderNumber} | Courier: ${body.courierName} | Tracking: ${body.trackingNumber} | Payment: ${body.paymentStatus}`
           }
         });
       }

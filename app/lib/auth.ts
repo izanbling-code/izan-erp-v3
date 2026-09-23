@@ -1,9 +1,21 @@
-import { NextRequest } from "next/server";
+﻿import { NextRequest } from "next/server";
 import { prisma } from "./prisma";
 
 export async function authenticate(request: NextRequest, requiredPermission?: string) {
-  const token = request.cookies.get("izan_session")?.value;
-  if (!token) return null;
+  const cookieVal = request.cookies.get("ib_session")?.value || request.cookies.get("izan_session")?.value;
+  if (!cookieVal) return null;
+  
+  let token = cookieVal;
+  
+  try {
+    const decoded = Buffer.from(cookieVal, "base64").toString("utf8");
+    if (decoded.includes('"token"')) {
+      const sessionPayload = JSON.parse(decoded);
+      token = sessionPayload.token;
+    }
+  } catch (e) {
+    // If it fails to parse, assume it is already a raw string token
+  }
   
   const session = await prisma.session.findFirst({
     where: { token, expiresAt: { gt: new Date() } },
