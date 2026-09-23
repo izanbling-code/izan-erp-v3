@@ -29,14 +29,29 @@ export async function POST(req: Request) {
 
     await prisma.$transaction(async (tx) => {
       
-      const invoiceCount = await tx.salesInvoice.count({ where: { companyId: order.companyId } });
-      const invoiceNo = `INV-${String(invoiceCount + 1).padStart(5, '0')}`;
+      // Dynamic Web Invoice Numbering Logic
+      const settings = await tx.companySettings.findUnique({ where: { companyId: order.companyId } });
+      const prefix = (settings as any)?.webInvoicePrefix || "WEB-";
+      const startNum = (settings as any)?.webInvoiceStartingNumber || 1;
+
+      const latest = await tx.salesInvoice.findFirst({
+        where: { companyId: order.companyId, invoiceNo: { startsWith: prefix } },
+        orderBy: { createdAt: "desc" }
+      });
+      
+      let nextNum = startNum;
+      if (latest && latest.invoiceNo) {
+        const numPart = latest.invoiceNo.substring(prefix.length);
+        const parsed = parseInt(numPart, 10);
+        if (!isNaN(parsed)) nextNum = parsed + 1;
+      }
+      
+      const invoiceNo = `${prefix}${String(nextNum).padStart(6, '0')}`;
       
       const deliveryCost = Number(deliveryFee) || 0;
       const orderTotal = Number(order.totalAmount) || 0;
 
       // 1. Create Invoice in DRAFT status. 
-      // Inject "Web Order", Courier, Tracking, and Payment Mode into the notes so it is visible in the Invoice module.
       const invoice = await tx.salesInvoice.create({
         data: {
           companyId: order.companyId,
