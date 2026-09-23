@@ -282,7 +282,7 @@ export default function UnifiedInvoicesDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0B1121] p-6 rounded-xl border border-slate-800">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Customer</label>
-                  <select value={formCustomerId} onChange={e => setFormCustomerId(e.target.value)} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded-lg p-3 text-sm outline-none focus:border-blue-500 transition appearance-none">
+                  <select value={formCustomerId} onChange={e => setFormCustomerId(e.target.value)} className="w-full !bg-white !text-black border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 transition appearance-none">
                     <option value="">Select Customer...</option>
                     {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
@@ -290,11 +290,11 @@ export default function UnifiedInvoicesDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Invoice #</label>
-                    <input type="text" value={editingId ? "Auto-Assigned" : "Generated on Save"} disabled className="w-full border border-slate-800 rounded-lg p-3 text-sm bg-slate-800/50 text-slate-400 font-mono" />
+                    <input type="text" value={editingId ? "Auto-Assigned" : "Generated on Save"} disabled className="w-full border border-slate-300 rounded-lg p-3 text-sm !bg-gray-100 !text-black font-mono shadow-inner" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">System Date</label>
-                    <input type="text" value={new Date().toLocaleDateString()} disabled className="w-full border border-slate-800 rounded-lg p-3 text-sm bg-slate-800/50 text-slate-400" />
+                    <input type="text" value={new Date().toLocaleDateString()} disabled className="w-full border border-slate-300 rounded-lg p-3 text-sm !bg-gray-100 !text-black shadow-inner" />
                   </div>
                 </div>
               </div>
@@ -307,7 +307,7 @@ export default function UnifiedInvoicesDashboard() {
                 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-[#131C2F] border-b border-slate-800 text-[10px] uppercase text-slate-500 font-bold">
+                    <thead className="!bg-white border-b border-slate-300 text-[10px] uppercase !text-black font-bold">
                       <tr><th className="p-3">Product</th><th className="p-3">Warehouse</th><th className="p-3">Batch</th><th className="p-3 w-20 text-center">Qty</th><th className="p-3 w-28 text-right">Price</th><th className="p-3 w-12 text-center"></th></tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
@@ -318,25 +318,25 @@ export default function UnifiedInvoicesDashboard() {
                               const p = products.find(x => x.id === e.target.value);
                               updateLine(l.id, "productId", e.target.value);
                               updateLine(l.id, "unitPrice", p?.salePrice || p?.costPrice || 0);
-                            }} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 focus:border-blue-500 outline-none text-xs">
+                            }} className="w-full !bg-white !text-black border border-slate-300 rounded p-2 focus:border-blue-500 outline-none text-xs">
                               <option value="">Select...</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                           </td>
                           <td className="p-3">
-                            <select value={l.warehouseId} onChange={e => updateLine(l.id, "warehouseId", e.target.value)} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 focus:border-blue-500 outline-none text-xs">
+                            <select value={l.warehouseId} onChange={e => updateLine(l.id, "warehouseId", e.target.value)} className="w-full !bg-white !text-black border border-slate-300 rounded p-2 focus:border-blue-500 outline-none text-xs">
                               <option value="">Select...</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                             </select>
                           </td>
                           <td className="p-3">
-                            <select value={l.batchId} onChange={e => updateLine(l.id, "batchId", e.target.value)} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 focus:border-blue-500 outline-none text-xs">
+                            <select value={l.batchId} onChange={e => updateLine(l.id, "batchId", e.target.value)} className="w-full !bg-white !text-black border border-slate-300 rounded p-2 focus:border-blue-500 outline-none text-xs">
                               <option value="">Select...</option>{stockBatches.filter(b => b.productId === l.productId && b.warehouseId === l.warehouseId).map(b => <option key={b.id} value={b.batchId}>{b.batch.batchNumber} (Avail: {b.quantity})</option>)}
                             </select>
                           </td>
                           <td className="p-3">
-                            <input type="number" min="1" value={l.quantity} onChange={e => updateLine(l.id, "quantity", Number(e.target.value))} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 text-center focus:border-blue-500 outline-none text-xs" />
+                            <input type="number" min="1" value={l.quantity} onChange={e => updateLine(l.id, "quantity", Number(e.target.value))} className="w-full !bg-white !text-black border border-slate-300 rounded p-2 text-center focus:border-blue-500 outline-none text-xs" />
                           </td>
                           <td className="p-3">
-                            <input type="number" min="0" value={l.unitPrice} onChange={e => updateLine(l.id, "unitPrice", Number(e.target.value))} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 text-right focus:border-blue-500 outline-none text-xs" />
+                            <input type="number" min="0" value={l.unitPrice} onChange={e => updateLine(l.id, "unitPrice", Number(e.target.value))} className="w-full !bg-white !text-black border border-slate-300 rounded p-2 text-right focus:border-blue-500 outline-none text-xs" />
                           </td>
                           <td className="p-3 text-center">
                             <button onClick={() => removeLine(l.id)} className="text-red-400 hover:text-red-300 font-bold p-1 transition">&times;</button>
@@ -351,7 +351,7 @@ export default function UnifiedInvoicesDashboard() {
               <div className="flex flex-col lg:flex-row justify-between items-start gap-8">
                 <div className="flex-1 w-full">
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Invoice Notes</label>
-                  <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="w-full bg-[#0B1121] border border-slate-800 text-white rounded-xl p-3 text-sm outline-none focus:border-blue-500 h-36" placeholder="Add terms, details, or optional notes here..."></textarea>
+                  <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="w-full !bg-white !text-black border border-slate-300 rounded-xl p-3 text-sm outline-none focus:border-blue-500 h-36" placeholder="Add terms, details, or optional notes here..."></textarea>
                 </div>
                 
                 <div className="w-full lg:w-80 bg-[#0B1121] p-6 rounded-xl border border-slate-800 space-y-4 text-sm">
@@ -362,15 +362,15 @@ export default function UnifiedInvoicesDashboard() {
                         {globalDiscountType === "FLAT" ? "₨" : "%"}
                       </button>
                     </span>
-                    <input type="number" min="0" value={globalDiscountVal} onChange={e => setGlobalDiscountVal(Number(e.target.value))} className="w-24 bg-[#131C2F] text-white border border-slate-700 rounded p-1.5 text-right text-sm outline-none focus:border-blue-500" />
+                    <input type="number" min="0" value={globalDiscountVal} onChange={e => setGlobalDiscountVal(Number(e.target.value))} className="w-24 !bg-white !text-black border border-slate-300 rounded p-1.5 text-right text-sm outline-none focus:border-blue-500" />
                   </div>
                   <div className="flex justify-between items-center text-slate-400">
                     <span>Global Tax (₨)</span>
-                    <input type="number" min="0" value={globalTax} onChange={e => setGlobalTax(Number(e.target.value))} className="w-24 bg-[#131C2F] text-white border border-slate-700 rounded p-1.5 text-right text-sm outline-none focus:border-blue-500" />
+                    <input type="number" min="0" value={globalTax} onChange={e => setGlobalTax(Number(e.target.value))} className="w-24 !bg-white !text-black border border-slate-300 rounded p-1.5 text-right text-sm outline-none focus:border-blue-500" />
                   </div>
                   <div className="flex justify-between items-center text-slate-400">
                     <span>Delivery (₨)</span>
-                    <input type="number" min="0" value={deliveryCharges} onChange={e => setDeliveryCharges(Number(e.target.value))} className="w-24 bg-[#131C2F] text-white border border-slate-700 rounded p-1.5 text-right text-sm outline-none focus:border-blue-500" />
+                    <input type="number" min="0" value={deliveryCharges} onChange={e => setDeliveryCharges(Number(e.target.value))} className="w-24 !bg-white !text-black border border-slate-300 rounded p-1.5 text-right text-sm outline-none focus:border-blue-500" />
                   </div>
                   <div className="flex justify-between items-center pt-4 mt-4 border-t border-slate-800">
                     <span className="font-bold text-slate-300 uppercase tracking-widest text-xs">Total</span>
