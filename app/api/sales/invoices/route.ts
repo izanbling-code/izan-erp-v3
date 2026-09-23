@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { authenticate } from "@/app/lib/auth";
 import type { Prisma } from "@/app/generated/prisma/client";
@@ -12,18 +12,35 @@ function cleanString(value: unknown): string | null { if (value === undefined ||
 async function getCompany() { return prisma.company.findFirst({ orderBy: { createdAt: "asc" } }); }
 
 async function nextEntryNumber(tx: Prisma.TransactionClient, companyId: string): Promise<string> {
-  const latest = await tx.journalEntry.findFirst({ where: { companyId }, orderBy: { createdAt: "desc" }, select: { entryNumber: true } });
-  const match = latest?.entryNumber?.match(/(\d+)$/);
-  if (!match) return "JE-000001";
-  return `JE-${String(Number(match[1]) + 1).padStart(6, "0")}`;
+  const settings = await tx.companySettings.findUnique({ where: { companyId } });
+  const prefix = (settings as any)?.journalPrefix || "JE-";
+  const startNum = (settings as any)?.journalStartingNumber || 1;
+
+  const latest = await tx.journalEntry.findFirst({ 
+    where: { companyId, entryNumber: { startsWith: prefix } }, 
+    orderBy: { createdAt: "desc" } 
+  });
+  
+  if (!latest || !latest.entryNumber) return `${prefix}${String(startNum).padStart(6, "0")}`;
+  const numPart = latest.entryNumber.substring(prefix.length);
+  const nextNum = parseInt(numPart, 10) + 1;
+  return `${prefix}${String(isNaN(nextNum) ? startNum : nextNum).padStart(6, "0")}`;
 }
 
 async function nextInvoiceNumber(tx: Prisma.TransactionClient, companyId: string): Promise<string> {
-  const latest = await tx.salesInvoice.findFirst({ where: { companyId, invoiceNo: { startsWith: 'INV-' } }, orderBy: { createdAt: "desc" } });
-  if (!latest || !latest.invoiceNo) return "INV-000001";
-  const match = latest.invoiceNo.match(/INV-(\d+)/);
-  if (!match) return "INV-000001";
-  return `INV-${String(Number(match[1]) + 1).padStart(6, "0")}`;
+  const settings = await tx.companySettings.findUnique({ where: { companyId } });
+  const prefix = (settings as any)?.invoicePrefix || "INV-";
+  const startNum = (settings as any)?.invoiceStartingNumber || 1;
+
+  const latest = await tx.salesInvoice.findFirst({ 
+    where: { companyId, invoiceNo: { startsWith: prefix } }, 
+    orderBy: { createdAt: "desc" } 
+  });
+  
+  if (!latest || !latest.invoiceNo) return `${prefix}${String(startNum).padStart(6, "0")}`;
+  const numPart = latest.invoiceNo.substring(prefix.length);
+  const nextNum = parseInt(numPart, 10) + 1;
+  return `${prefix}${String(isNaN(nextNum) ? startNum : nextNum).padStart(6, "0")}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -33,10 +50,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = cleanString(searchParams.get("search"));
-    const tab = cleanString(searchParams.get("tab")) || "posted";
+    const tab = cleanString(searchParams.get("tab")) || "draft";
     const id = cleanString(searchParams.get("id"));
 
-    // FAST PATH: Instant Lookup for Print Engine
     if (id) {
       const invoice = await prisma.salesInvoice.findFirst({
         where: { id: id, companyId: company.id },
@@ -46,8 +62,12 @@ export async function GET(request: NextRequest) {
     }
 
     let whereClause: any = { companyId: company.id };
-    if (tab === "unposted") {
+    
+    if (tab === "draft") {
       whereClause.status = "DRAFT";
+    } else if (tab === "web") {
+      // Assuming Web Orders are tagged in notes or originate from the shop
+      whereClause.notes = { contains: "Web Order", mode: "insensitive" };
     } else {
       whereClause.status = { in: ["POSTED", "PARTIAL", "PAID", "VOID"] };
     }
@@ -107,7 +127,7 @@ export async function POST(request: NextRequest) {
       return await tx.salesInvoice.create({
         data: {
           companyId: company.id, customerId, invoiceNo,
-          invoiceDate: new Date(), // HARD LOCKED TO CURRENT DATE
+          invoiceDate: new Date(),
           dueDate: null,
           status: "DRAFT",
           subtotal: lineSubtotal, discount: totalDiscount, tax: totalTax, deliveryCharges, total,
@@ -124,7 +144,6 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    // Automatically post if requested
     if (body.status === "POSTED") {
       const settings = await prisma.companySettings.findUnique({ where: { companyId: company.id } });
       await postSingleInvoice(result, (settings?.accounting as any) ?? {}, company.id);
@@ -150,7 +169,6 @@ export async function PUT(request: NextRequest) {
     const existing = await prisma.salesInvoice.findUnique({ where: { id: body.id, companyId: company.id }, include: { lines: true, journal: { include: { lines: true } } } });
     if (!existing) return NextResponse.json({ ok: false, error: "Invoice not found" }, { status: 404 });
 
-    // SECURITY CHECK: If editing a posted invoice, verify Admin rights
     if (existing.status !== "DRAFT") {
       if (Number(existing.paid) > 0) return NextResponse.json({ ok: false, error: "Cannot edit an invoice that has payments applied. Remove payments first." }, { status: 403 });
       
@@ -177,7 +195,6 @@ export async function PUT(request: NextRequest) {
     const total = lineSubtotal - totalDiscount + totalTax + deliveryCharges;
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. If it was POSTED, completely REVERSE the old data first
       if (existing.status !== "DRAFT") {
         for (const oldLine of existing.lines) {
           await tx.stockBatch.updateMany({ where: { batchId: oldLine.batchId!, warehouseId: oldLine.warehouseId! }, data: { quantity: { increment: oldLine.quantity } } });
@@ -191,7 +208,6 @@ export async function PUT(request: NextRequest) {
         }
       }
 
-      // 2. Clear old lines & Insert new ones
       await tx.salesInvoiceLine.deleteMany({ where: { invoiceId: existing.id } });
       
       const updatedInv = await tx.salesInvoice.update({
@@ -199,7 +215,7 @@ export async function PUT(request: NextRequest) {
         data: {
           customerId: body.customerId,
           subtotal: lineSubtotal, discount: totalDiscount, tax: totalTax, deliveryCharges, total, balance: total, notes: cleanString(body.notes),
-          status: "DRAFT", // Temporarily draft
+          status: "DRAFT",
           lines: {
             create: lines.map(l => ({
               productId: l.productId, batchId: l.batchId, warehouseId: l.warehouseId,
@@ -213,7 +229,6 @@ export async function PUT(request: NextRequest) {
       return updatedInv;
     });
 
-    // 3. If requested, repost the new data
     if (body.status === "POSTED" || existing.status !== "DRAFT") {
       const settings = await prisma.companySettings.findUnique({ where: { companyId: company.id } });
       await postSingleInvoice(result, (settings?.accounting as any) ?? {}, company.id);

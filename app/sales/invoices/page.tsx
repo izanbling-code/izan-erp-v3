@@ -1,14 +1,15 @@
-"use client";
+﻿"use client";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
+import { Plus, Edit, Printer, CreditCard, FileText, CheckCircle, Globe, PackageOpen } from "lucide-react";
 
 type InvoiceLine = { id: string; productId: string; warehouseId: string; batchId: string; quantity: number; unitPrice: number; discount: number; tax: number; };
 
 export default function UnifiedInvoicesDashboard() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"unposted" | "posted">("unposted");
+  const [activeTab, setActiveTab] = useState<"draft" | "posted" | "web">("draft");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -31,6 +32,12 @@ export default function UnifiedInvoicesDashboard() {
   const [globalDiscountVal, setGlobalDiscountVal] = useState(0);
   const [globalTax, setGlobalTax] = useState(0);
   const [deliveryCharges, setDeliveryCharges] = useState(0);
+
+  const tabs = [
+    { id: "draft", label: "Drafts", icon: <FileText className="w-4 h-4" /> },
+    { id: "posted", label: "Posted & Paid", icon: <CheckCircle className="w-4 h-4" /> },
+    { id: "web", label: "Web Orders", icon: <Globe className="w-4 h-4" /> }
+  ] as const;
 
   useEffect(() => { loadInvoices(); }, [activeTab, search]);
 
@@ -121,74 +128,132 @@ export default function UnifiedInvoicesDashboard() {
   const formatMoney = (val: number) => `₨ ${Number(val).toFixed(2)}`;
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6 relative">
+    <div className="min-h-screen bg-[#0B1121] text-slate-200 p-6 font-sans relative">
       <Toaster position="top-right" />
       
       {/* GRAPHICAL HEADER */}
-      <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 rounded-2xl p-8 text-white shadow-lg flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <p className="text-indigo-200 text-sm font-bold tracking-widest uppercase mb-1">Sales & Billing</p>
-          <h1 className="text-3xl font-black">Invoices Command Center</h1>
+          <p className="text-blue-400 text-xs font-bold tracking-widest uppercase mb-1">Sales & Billing</p>
+          <h1 className="text-2xl font-bold text-white">Invoices Command Center</h1>
         </div>
-        <button onClick={openNewInvoice} className="bg-white text-indigo-700 hover:bg-indigo-50 px-6 py-3 rounded-xl font-bold shadow-md transition flex items-center gap-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"></path></svg>
-          New Invoice
+        <button onClick={openNewInvoice} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg shadow-blue-500/20 transition flex items-center gap-2">
+          <Plus className="w-4 h-4" /> New Invoice
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="flex justify-between items-center bg-gray-50 border-b border-gray-200 px-6 py-4">
-          <div className="flex gap-2 bg-white p-1 border rounded-lg shadow-sm">
-            <button onClick={() => setActiveTab("unposted")} className={`px-4 py-1.5 rounded font-bold text-sm transition ${activeTab === "unposted" ? "bg-indigo-50 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}>Drafts</button>
-            <button onClick={() => setActiveTab("posted")} className={`px-4 py-1.5 rounded font-bold text-sm transition ${activeTab === "posted" ? "bg-indigo-50 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}>Posted & Paid</button>
+      <div className="bg-[#131C2F] rounded-xl shadow-sm border border-slate-800 overflow-hidden">
+        
+        {/* TABS & SEARCH */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#0B1121] border-b border-slate-800 px-6 py-4 gap-4">
+          <div className="flex gap-2 overflow-x-auto custom-scrollbar">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 text-sm font-bold whitespace-nowrap rounded-lg flex items-center gap-2 transition-all ${
+                  activeTab === tab.id ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"
+                }`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
           </div>
-          <div className="flex gap-3 items-center">
-            <input type="text" placeholder="Search invoices..." value={search} onChange={(e) => setSearch(e.target.value)} className="border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none w-64 shadow-inner focus:ring-2 focus:ring-indigo-500 transition" />
-            {activeTab === "unposted" && <button onClick={bulkPost} disabled={busy || selectedIds.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50 transition shadow-sm">Post Selected ({selectedIds.length})</button>}
+          
+          <div className="flex gap-3 items-center w-full md:w-auto">
+            <input 
+              type="text" 
+              placeholder="Search invoices..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              className="bg-[#131C2F] border border-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-2 text-sm outline-none w-full md:w-64 focus:border-blue-500 transition" 
+            />
+            {activeTab === "draft" && (
+              <button 
+                onClick={bulkPost} 
+                disabled={busy || selectedIds.length === 0} 
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50 transition whitespace-nowrap"
+              >
+                Post Selected ({selectedIds.length})
+              </button>
+            )}
           </div>
         </div>
 
+        {/* DATA TABLE */}
         <div className="overflow-x-auto min-h-[400px]">
-          {loading ? <div className="text-center py-20 text-indigo-400 font-bold animate-pulse">Synchronizing Ledger...</div> : (
-            <table className="erp-data-table">
-              <thead className="bg-white border-b"><tr className="text-[11px] uppercase text-gray-500 font-extrabold tracking-wider">
-                {activeTab === "unposted" && <th className="py-4 px-5 w-10"></th>}
-                <th className="py-4 px-5">Invoice #</th><th className="py-4 px-5">Customer</th><th className="py-4 px-5">Date</th><th className="py-4 px-5">Status</th><th className="py-4 px-5 text-right">Total</th><th className="py-4 px-5 text-right">Balance</th><th className="py-4 px-5 text-center">Actions</th>
-              </tr></thead>
-              <tbody className="divide-y divide-gray-100">
+          {loading ? (
+            <div className="text-center py-20 text-blue-400 font-bold animate-pulse">Synchronizing Ledger...</div>
+          ) : (
+            <table className="w-full text-left text-sm whitespace-nowrap !bg-[#131C2F]">
+              <thead className="!bg-[#0B1121] !text-slate-400 text-[11px] uppercase tracking-wider">
+                <tr>
+                  {activeTab === "draft" && <th className="p-4 w-12 text-center !border-b !border-slate-800"></th>}
+                  <th className="p-4 font-semibold !border-b !border-slate-800">Invoice #</th>
+                  <th className="p-4 font-semibold !border-b !border-slate-800">Customer</th>
+                  <th className="p-4 font-semibold !border-b !border-slate-800">Date</th>
+                  <th className="p-4 font-semibold text-center !border-b !border-slate-800">Status</th>
+                  <th className="p-4 font-semibold text-right !border-b !border-slate-800">Total</th>
+                  <th className="p-4 font-semibold text-right !border-b !border-slate-800">Balance</th>
+                  <th className="p-4 font-semibold text-center !border-b !border-slate-800">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="!divide-y !divide-slate-800/50">
                 {invoices.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-24 text-center">
                       <div className="flex flex-col items-center justify-center space-y-4">
-                        <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center shadow-inner">
-                          <svg className="w-12 h-12 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        </div>
-                        <h3 className="text-xl font-extrabold text-gray-900">No invoices found</h3>
-                        <p className="text-sm text-gray-500 max-w-sm mx-auto">
-                          {activeTab === "unposted" ? "You don't have any unposted drafts right now. Create a new invoice to start billing." : "You don't have any posted or paid invoices matching this criteria."}
+                        <PackageOpen className="w-12 h-12 text-slate-500 opacity-50" />
+                        <h3 className="text-lg font-bold text-slate-400">No invoices found</h3>
+                        <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                          {activeTab === "draft" ? "You don't have any unposted drafts right now. Create a new invoice to start billing." : "No matching invoices found in this section."}
                         </p>
-                        {activeTab === "unposted" && (
-                          <button onClick={openNewInvoice} className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition shadow-sm">
-                            Create First Invoice
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
                 ) : invoices.map(inv => {
                   const displayStatus = inv.status === "POSTED" ? "UNPAID" : inv.status;
                   return (
-                    <tr key={inv.id} className="hover:bg-indigo-50/30 transition">
-                      {activeTab === "unposted" && <td className="py-3 px-5"><input type="checkbox" checked={selectedIds.includes(inv.id)} onChange={() => toggleSelect(inv.id)} className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500" /></td>}
-                      <td className="py-3 px-5 font-bold text-gray-900">{inv.invoiceNo}</td>
-                      <td className="py-3 px-5 font-semibold text-indigo-700">{inv.customer?.name || "Walk-in"}</td>
-                      <td className="py-3 px-5 text-gray-600">{new Date(inv.invoiceDate).toISOString().slice(0, 10)}</td>
-                      <td className="py-3 px-5"><span className={`px-2.5 py-1 rounded text-[10px] font-bold tracking-widest ${displayStatus === "UNPAID" ? "bg-amber-100 text-amber-800 border border-amber-200" : displayStatus === "DRAFT" ? "bg-gray-100 text-gray-600 border border-gray-200" : "bg-emerald-100 text-emerald-800 border border-emerald-200"}`}>{displayStatus}</span></td>
-                      <td className="py-3 px-5 text-right font-black text-gray-900">{formatMoney(inv.total)}</td>
-                      <td className="py-3 px-5 text-right font-black text-rose-600">{formatMoney(inv.balance)}</td>
-                      <td className="py-3 px-5 text-center space-x-2">
-                        {Number(inv.paid) === 0 && <button onClick={() => openEditInvoice(inv)} className="text-xs font-bold bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 px-3 py-1.5 rounded transition shadow-sm">Edit</button>}
-                        <Link href={`/sales/invoices/print/${inv.id}`} target="_blank" className="inline-block text-xs font-bold bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded transition shadow-sm">🖨️ Print</Link>
+                    <tr key={inv.id} className="!bg-[#131C2F] hover:!bg-[#1e293b] transition-colors group">
+                      {activeTab === "draft" && (
+                        <td className="p-4 text-center">
+                          <input type="checkbox" checked={selectedIds.includes(inv.id)} onChange={() => toggleSelect(inv.id)} className="accent-blue-500 w-4 h-4 rounded cursor-pointer" />
+                        </td>
+                      )}
+                      <td className="p-4 font-bold !text-white group-hover:!text-white transition-colors">{inv.invoiceNo}</td>
+                      <td className="p-4 font-semibold !text-blue-400 group-hover:!text-blue-400 transition-colors">{inv.customer?.name || "Walk-in"}</td>
+                      <td className="p-4 !text-slate-400 group-hover:!text-slate-300 transition-colors">{new Date(inv.invoiceDate).toISOString().slice(0, 10)}</td>
+                      <td className="p-4 text-center">
+                        <span className={`px-2.5 py-1 rounded text-[10px] font-bold tracking-widest ${
+                          displayStatus === "UNPAID" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : 
+                          displayStatus === "DRAFT" ? "bg-slate-500/10 text-slate-400 border border-slate-500/20" : 
+                          "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        }`}>
+                          {displayStatus}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right font-bold !text-slate-200 group-hover:!text-white transition-colors">{formatMoney(inv.total)}</td>
+                      <td className="p-4 text-right font-bold !text-rose-400 group-hover:!text-rose-400 transition-colors">{formatMoney(inv.balance)}</td>
+                      <td className="p-4 text-center">
+                        <div className="flex items-center justify-center gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          
+                          {/* PAY BUTTON DIRECTS TO PAYMENTS */}
+                          {inv.status !== "DRAFT" && Number(inv.balance) > 0 && (
+                             <Link href={`/payments?invoiceId=${inv.id}`} className="!text-emerald-400 hover:!text-emerald-300 flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
+                               <CreditCard className="w-3 h-3" /> Pay
+                             </Link>
+                          )}
+                          
+                          {Number(inv.paid) === 0 && (
+                            <button onClick={() => openEditInvoice(inv)} className="!text-blue-400 hover:!text-blue-300 flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
+                              <Edit className="w-3 h-3" /> Edit
+                            </button>
+                          )}
+                          
+                          <Link href={`/sales/invoices/print/${inv.id}`} target="_blank" className="!text-slate-300 hover:!text-white flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
+                            <Printer className="w-3 h-3" /> Print
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -201,90 +266,134 @@ export default function UnifiedInvoicesDashboard() {
 
       {/* SINGLE-PAGE INVOICE MODAL */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex justify-end">
-          <div className="bg-white w-full max-w-4xl h-full shadow-2xl flex flex-col animate-fade-in-right">
-            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
+          <div className="bg-[#131C2F] border-l border-slate-800 w-full max-w-5xl h-full shadow-2xl flex flex-col animate-fade-in-right">
+            
+            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-[#0B1121]">
               <div>
-                <h2 className="text-xl font-black text-gray-900">{editingId ? "Edit Invoice" : "Create New Invoice"}</h2>
-                {isPostedEdit && <p className="text-xs font-bold text-rose-600 uppercase tracking-wider mt-1">Warning: Editing a posted invoice will trigger an automatic ledger reversal.</p>}
+                <h2 className="text-xl font-bold text-white">{editingId ? "Edit Invoice" : "Create New Invoice"}</h2>
+                {isPostedEdit && <p className="text-xs font-bold text-rose-400 uppercase tracking-wider mt-1">Warning: Editing a posted invoice will trigger an automatic ledger reversal.</p>}
               </div>
-              <button onClick={() => !busy && setShowModal(false)} className="text-gray-400 hover:text-gray-800 font-bold text-3xl">&times;</button>
+              <button onClick={() => !busy && setShowModal(false)} className="text-slate-500 hover:text-white text-3xl transition">&times;</button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-white">
-              <div className="grid grid-cols-2 gap-6 bg-gray-50 p-6 rounded-xl border border-gray-100">
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 custom-scrollbar text-slate-200">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0B1121] p-6 rounded-xl border border-slate-800">
                 <div>
-                  <label className="block text-xs font-extrabold text-indigo-900 uppercase tracking-wider mb-2">Customer</label>
-                  <select value={formCustomerId} onChange={e => setFormCustomerId(e.target.value)} className="w-full border-gray-300 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm transition">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Customer</label>
+                  <select value={formCustomerId} onChange={e => setFormCustomerId(e.target.value)} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded-lg p-3 text-sm outline-none focus:border-blue-500 transition appearance-none">
                     <option value="">Select Customer...</option>
                     {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-extrabold text-indigo-900 uppercase tracking-wider mb-2">Invoice #</label>
-                    <input type="text" value={editingId ? "Auto-Assigned" : "Generated on Save"} disabled className="w-full border border-gray-200 rounded-lg p-3 text-sm bg-gray-100 text-gray-500 font-mono shadow-inner" />
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Invoice #</label>
+                    <input type="text" value={editingId ? "Auto-Assigned" : "Generated on Save"} disabled className="w-full border border-slate-800 rounded-lg p-3 text-sm bg-slate-800/50 text-slate-400 font-mono" />
                   </div>
                   <div>
-                    <label className="block text-xs font-extrabold text-indigo-900 uppercase tracking-wider mb-2">System Date</label>
-                    <input type="text" value={new Date().toLocaleDateString()} disabled className="w-full border border-gray-200 rounded-lg p-3 text-sm bg-gray-100 text-gray-500 shadow-inner" />
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">System Date</label>
+                    <input type="text" value={new Date().toLocaleDateString()} disabled className="w-full border border-slate-800 rounded-lg p-3 text-sm bg-slate-800/50 text-slate-400" />
                   </div>
                 </div>
               </div>
 
-              <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <div className="bg-indigo-50/50 px-5 py-4 border-b border-gray-200 flex justify-between items-center">
-                  <h3 className="font-extrabold text-indigo-900 text-sm uppercase tracking-wider">Invoice Line Items</h3>
-                  <button onClick={addLine} className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-1.5 text-xs font-bold rounded-lg shadow-sm transition">+ Add Row</button>
+              <div className="border border-slate-800 rounded-xl overflow-hidden shadow-sm bg-[#0B1121]">
+                <div className="bg-slate-800/30 px-5 py-4 border-b border-slate-800 flex justify-between items-center">
+                  <h3 className="font-bold text-slate-300 text-sm uppercase tracking-wider">Invoice Line Items</h3>
+                  <button onClick={addLine} className="bg-blue-600 text-white hover:bg-blue-500 px-4 py-1.5 text-xs font-bold rounded-lg transition">+ Add Row</button>
                 </div>
-                <table className="erp-data-table">
-                  <thead className="bg-gray-50 border-b border-gray-200 text-[10px] uppercase text-gray-500 font-bold">
-                    <tr><th className="p-3">Product</th><th className="p-3">Warehouse</th><th className="p-3">Batch</th><th className="p-3 w-20 text-center">Qty</th><th className="p-3 w-24 text-right">Price</th><th className="p-3 w-12 text-center"></th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {lines.map((l) => (
-                      <tr key={l.id} className="hover:bg-gray-50 transition">
-                        <td className="p-3"><select value={l.productId} onChange={e => {
-                          const p = products.find(x => x.id === e.target.value);
-                          updateLine(l.id, "productId", e.target.value);
-                          updateLine(l.id, "unitPrice", p?.salePrice || p?.costPrice || 0);
-                        }} className="w-full border border-gray-200 rounded p-2 focus:ring-indigo-500 focus:border-indigo-500"><option value="">Select...</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></td>
-                        <td className="p-3"><select value={l.warehouseId} onChange={e => updateLine(l.id, "warehouseId", e.target.value)} className="w-full border border-gray-200 rounded p-2 focus:ring-indigo-500 focus:border-indigo-500"><option value="">Select...</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select></td>
-                        <td className="p-3"><select value={l.batchId} onChange={e => updateLine(l.id, "batchId", e.target.value)} className="w-full border border-gray-200 rounded p-2 focus:ring-indigo-500 focus:border-indigo-500"><option value="">Select...</option>{stockBatches.filter(b => b.productId === l.productId && b.warehouseId === l.warehouseId).map(b => <option key={b.id} value={b.batchId}>{b.batch.batchNumber} (Avail: {b.quantity})</option>)}</select></td>
-                        <td className="p-3"><input type="number" min="1" value={l.quantity} onChange={e => updateLine(l.id, "quantity", Number(e.target.value))} className="w-full border border-gray-200 rounded p-2 text-center focus:ring-indigo-500 focus:border-indigo-500" /></td>
-                        <td className="p-3"><input type="number" min="0" value={l.unitPrice} onChange={e => updateLine(l.id, "unitPrice", Number(e.target.value))} className="w-full border border-gray-200 rounded p-2 text-right focus:ring-indigo-500 focus:border-indigo-500" /></td>
-                        <td className="p-3 text-center"><button onClick={() => removeLine(l.id)} className="text-rose-500 font-black hover:bg-rose-100 p-2 rounded transition">&times;</button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#131C2F] border-b border-slate-800 text-[10px] uppercase text-slate-500 font-bold">
+                      <tr><th className="p-3">Product</th><th className="p-3">Warehouse</th><th className="p-3">Batch</th><th className="p-3 w-20 text-center">Qty</th><th className="p-3 w-28 text-right">Price</th><th className="p-3 w-12 text-center"></th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {lines.map((l) => (
+                        <tr key={l.id} className="hover:bg-slate-800/20 transition">
+                          <td className="p-3">
+                            <select value={l.productId} onChange={e => {
+                              const p = products.find(x => x.id === e.target.value);
+                              updateLine(l.id, "productId", e.target.value);
+                              updateLine(l.id, "unitPrice", p?.salePrice || p?.costPrice || 0);
+                            }} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 focus:border-blue-500 outline-none text-xs">
+                              <option value="">Select...</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <select value={l.warehouseId} onChange={e => updateLine(l.id, "warehouseId", e.target.value)} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 focus:border-blue-500 outline-none text-xs">
+                              <option value="">Select...</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <select value={l.batchId} onChange={e => updateLine(l.id, "batchId", e.target.value)} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 focus:border-blue-500 outline-none text-xs">
+                              <option value="">Select...</option>{stockBatches.filter(b => b.productId === l.productId && b.warehouseId === l.warehouseId).map(b => <option key={b.id} value={b.batchId}>{b.batch.batchNumber} (Avail: {b.quantity})</option>)}
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <input type="number" min="1" value={l.quantity} onChange={e => updateLine(l.id, "quantity", Number(e.target.value))} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 text-center focus:border-blue-500 outline-none text-xs" />
+                          </td>
+                          <td className="p-3">
+                            <input type="number" min="0" value={l.unitPrice} onChange={e => updateLine(l.id, "unitPrice", Number(e.target.value))} className="w-full bg-[#131C2F] text-white border border-slate-700 rounded p-2 text-right focus:border-blue-500 outline-none text-xs" />
+                          </td>
+                          <td className="p-3 text-center">
+                            <button onClick={() => removeLine(l.id)} className="text-red-400 hover:text-red-300 font-bold p-1 transition">&times;</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div className="flex justify-between items-start gap-8">
-                <div className="flex-1">
-                  <label className="block text-xs font-extrabold text-gray-500 uppercase tracking-wider mb-2">Invoice Notes</label>
-                  <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 h-36 shadow-sm" placeholder="Add terms, details, or optional notes here..."></textarea>
+              <div className="flex flex-col lg:flex-row justify-between items-start gap-8">
+                <div className="flex-1 w-full">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Invoice Notes</label>
+                  <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} className="w-full bg-[#0B1121] border border-slate-800 text-white rounded-xl p-3 text-sm outline-none focus:border-blue-500 h-36" placeholder="Add terms, details, or optional notes here..."></textarea>
                 </div>
-                <div className="w-80 bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm space-y-3 text-sm">
-                  <div className="flex justify-between text-gray-600"><span>Subtotal</span><span className="font-bold text-gray-900">{formatMoney(totals.subtotal)}</span></div>
-                  <div className="flex justify-between items-center text-gray-600">
-                    <span className="flex items-center gap-2">Discount <button onClick={() => setGlobalDiscountType(t => t === "FLAT" ? "PERCENT" : "FLAT")} className="text-[10px] bg-white border border-gray-300 shadow-sm px-2 py-1 rounded font-bold uppercase hover:bg-gray-100 transition">{globalDiscountType === "FLAT" ? "₨" : "%"}</button></span>
-                    <input type="number" min="0" value={globalDiscountVal} onChange={e => setGlobalDiscountVal(Number(e.target.value))} className="w-24 border border-gray-300 rounded p-1.5 text-right text-sm outline-none focus:ring-1 focus:ring-indigo-500" />
+                
+                <div className="w-full lg:w-80 bg-[#0B1121] p-6 rounded-xl border border-slate-800 space-y-4 text-sm">
+                  <div className="flex justify-between text-slate-400"><span>Subtotal</span><span className="font-bold text-white">{formatMoney(totals.subtotal)}</span></div>
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span className="flex items-center gap-2">Discount 
+                      <button onClick={() => setGlobalDiscountType(t => t === "FLAT" ? "PERCENT" : "FLAT")} className="text-[10px] bg-[#131C2F] border border-slate-700 px-2 py-1 rounded font-bold uppercase hover:bg-slate-800 transition">
+                        {globalDiscountType === "FLAT" ? "₨" : "%"}
+                      </button>
+                    </span>
+                    <input type="number" min="0" value={globalDiscountVal} onChange={e => setGlobalDiscountVal(Number(e.target.value))} className="w-24 bg-[#131C2F] text-white border border-slate-700 rounded p-1.5 text-right text-sm outline-none focus:border-blue-500" />
                   </div>
-                  <div className="flex justify-between items-center text-gray-600"><span>Global Tax (₨)</span><input type="number" min="0" value={globalTax} onChange={e => setGlobalTax(Number(e.target.value))} className="w-24 border border-gray-300 rounded p-1.5 text-right text-sm outline-none focus:ring-1 focus:ring-indigo-500" /></div>
-                  <div className="flex justify-between items-center text-gray-600"><span>Delivery (₨)</span><input type="number" min="0" value={deliveryCharges} onChange={e => setDeliveryCharges(Number(e.target.value))} className="w-24 border border-gray-300 rounded p-1.5 text-right text-sm outline-none focus:ring-1 focus:ring-indigo-500" /></div>
-                  <div className="flex justify-between items-center pt-4 mt-4 border-t-2 border-gray-300"><span className="font-black text-gray-900 uppercase tracking-widest text-xs">Total</span><span className="font-black text-2xl text-indigo-700">{formatMoney(totals.total)}</span></div>
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span>Global Tax (₨)</span>
+                    <input type="number" min="0" value={globalTax} onChange={e => setGlobalTax(Number(e.target.value))} className="w-24 bg-[#131C2F] text-white border border-slate-700 rounded p-1.5 text-right text-sm outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span>Delivery (₨)</span>
+                    <input type="number" min="0" value={deliveryCharges} onChange={e => setDeliveryCharges(Number(e.target.value))} className="w-24 bg-[#131C2F] text-white border border-slate-700 rounded p-1.5 text-right text-sm outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="flex justify-between items-center pt-4 mt-4 border-t border-slate-800">
+                    <span className="font-bold text-slate-300 uppercase tracking-widest text-xs">Total</span>
+                    <span className="font-black text-2xl text-emerald-400">{formatMoney(totals.total)}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="px-6 py-5 border-t bg-gray-50 flex justify-end gap-3 shadow-inner">
-              <button disabled={busy} onClick={() => saveInvoice("DRAFT")} className="px-6 py-2.5 border border-gray-300 bg-white hover:bg-gray-100 rounded-lg font-bold text-gray-700 text-sm transition shadow-sm">Save as Draft</button>
-              <button disabled={busy} onClick={() => saveInvoice("POSTED")} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm shadow-md transition transform hover:-translate-y-0.5">Finalize & Post to Ledger</button>
+            <div className="px-6 py-5 border-t border-slate-800 bg-[#0B1121] flex justify-end gap-3">
+              <button disabled={busy} onClick={() => saveInvoice("DRAFT")} className="px-6 py-2.5 bg-[#131C2F] border border-slate-700 hover:bg-slate-800 text-white rounded-lg font-bold text-sm transition">Save as Draft</button>
+              <button disabled={busy} onClick={() => saveInvoice("POSTED")} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-sm transition shadow-lg shadow-blue-500/20">Finalize & Post to Ledger</button>
             </div>
           </div>
         </div>
       )}
+      
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.4); border-radius: 8px; }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.8); }
+      `}} />
     </div>
   );
 }
