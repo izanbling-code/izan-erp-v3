@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       const orderTotal = Number(order.totalAmount) || 0;
 
       // 1. Create Invoice in DRAFT status. 
-      // Inject Courier, Tracking, and Payment Mode into the notes so it is visible in the Invoice module.
+      // Inject "Web Order", Courier, Tracking, and Payment Mode into the notes so it is visible in the Invoice module.
       const invoice = await tx.salesInvoice.create({
         data: {
           companyId: order.companyId,
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
           subtotal: orderTotal,
           deliveryCharges: deliveryCost,
           total: orderTotal + deliveryCost,
-          notes: `Order: ${order.orderNumber} | Courier: ${courierName || 'N/A'} | Tracking: ${bookingRef || 'N/A'} | Payment: ${paymentStatus}`
+          notes: `Web Order | Order: ${order.orderNumber} | Courier: ${courierName || 'N/A'} | Tracking: ${bookingRef || 'N/A'} | Payment: ${paymentStatus}`
         }
       });
 
