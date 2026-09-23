@@ -196,6 +196,7 @@ export default function OrderPipelinePage() {
 
   const openManage = (order: any) => {
     setActiveOrder(order);
+    
     setEditLines(order.lines.map((l: any) => ({
       id: l.id,
       productId: l.productId,
@@ -232,6 +233,7 @@ export default function OrderPipelinePage() {
   return (
     <>
       <div className="no-print min-h-screen bg-[#0B1121] text-slate-200 p-6 font-sans relative">
+        
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white">Order Pipeline</h1>
@@ -309,7 +311,7 @@ export default function OrderPipelinePage() {
                     </thead>
                     <tbody className="!divide-y !divide-slate-800/50">
                       {filteredOrders.map(order => (
-                        <tr key={order.id} className="!bg-[#131C2F] hover:!bg-[#1e293b] transition-colors group">
+                        <tr key={order.id} className="!bg-[#131C2F] hover:!bg-white transition-colors group">
                           {activeTab === "SALE_ORDER" && (
                             <td className="p-4 text-center">
                               <input 
@@ -323,20 +325,20 @@ export default function OrderPipelinePage() {
                               />
                             </td>
                           )}
-                          <td className="p-4 font-bold !text-white">{order.orderNumber}</td>
-                          <td className="p-4 !text-slate-300">{order.customer?.name}</td>
-                          <td className="p-4 text-center !text-slate-400">{order.lines.length}</td>
-                          <td className="p-4 text-right font-bold !text-emerald-400">{formatCurrency(Number(order.totalAmount))}</td>
+                          <td className="p-4 font-bold !text-white group-hover:!text-black transition-colors">{order.orderNumber}</td>
+                          <td className="p-4 !text-slate-300 group-hover:!text-black transition-colors">{order.customer?.name}</td>
+                          <td className="p-4 text-center !text-slate-400 group-hover:!text-black transition-colors">{order.lines.length}</td>
+                          <td className="p-4 text-right font-bold !text-emerald-400 group-hover:!text-emerald-600 transition-colors">{formatCurrency(Number(order.totalAmount))}</td>
                           <td className="p-4 text-center">
                             <div className="flex items-center justify-center gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => setViewingOrder(order)} className="!text-slate-300 hover:!text-white flex items-center gap-1 text-xs font-bold uppercase tracking-wider">
+                              <button onClick={() => setViewingOrder(order)} className="!text-slate-300 group-hover:!text-slate-600 hover:!text-black flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
                                 <Eye className="w-3 h-3" /> View
                               </button>
-                              <button onClick={() => openManage(order)} className="!text-blue-400 hover:!text-blue-300 flex items-center gap-1 text-xs font-bold uppercase tracking-wider">
+                              <button onClick={() => openManage(order)} className="!text-blue-400 group-hover:!text-blue-600 hover:!text-blue-800 flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
                                 <Edit className="w-3 h-3" /> Edit/Action
                               </button>
                               {activeTab === "SALE_ORDER" && (
-                                <button onClick={() => handleDeleteOrder(order.id)} className="!text-red-400 hover:!text-red-300 flex items-center gap-1 text-xs font-bold uppercase tracking-wider">
+                                <button onClick={() => handleDeleteOrder(order.id)} className="!text-red-400 group-hover:!text-red-500 hover:!text-red-800 flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
                                   <Trash2 className="w-3 h-3" /> Cancel
                                 </button>
                               )}
