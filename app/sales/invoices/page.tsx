@@ -214,15 +214,15 @@ export default function UnifiedInvoicesDashboard() {
                 ) : invoices.map(inv => {
                   const displayStatus = inv.status === "POSTED" ? "UNPAID" : inv.status;
                   return (
-                    <tr key={inv.id} className="!bg-[#131C2F] hover:!bg-[#1e293b] transition-colors group">
+                    <tr key={inv.id} className="!bg-[#131C2F] hover:!bg-white transition-colors group">
                       {activeTab === "draft" && (
                         <td className="p-4 text-center">
                           <input type="checkbox" checked={selectedIds.includes(inv.id)} onChange={() => toggleSelect(inv.id)} className="accent-blue-500 w-4 h-4 rounded cursor-pointer" />
                         </td>
                       )}
-                      <td className="p-4 font-bold !text-white group-hover:!text-white transition-colors">{inv.invoiceNo}</td>
-                      <td className="p-4 font-semibold !text-blue-400 group-hover:!text-blue-400 transition-colors">{inv.customer?.name || "Walk-in"}</td>
-                      <td className="p-4 !text-slate-400 group-hover:!text-slate-300 transition-colors">{new Date(inv.invoiceDate).toISOString().slice(0, 10)}</td>
+                      <td className="p-4 font-bold !text-white group-hover:!text-black transition-colors">{inv.invoiceNo}</td>
+                      <td className="p-4 font-semibold !text-blue-400 group-hover:!text-black transition-colors">{inv.customer?.name || "Walk-in"}</td>
+                      <td className="p-4 !text-slate-400 group-hover:!text-black transition-colors">{new Date(inv.invoiceDate).toISOString().slice(0, 10)}</td>
                       <td className="p-4 text-center">
                         <span className={`px-2.5 py-1 rounded text-[10px] font-bold tracking-widest ${
                           displayStatus === "UNPAID" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : 
@@ -232,25 +232,25 @@ export default function UnifiedInvoicesDashboard() {
                           {displayStatus}
                         </span>
                       </td>
-                      <td className="p-4 text-right font-bold !text-slate-200 group-hover:!text-white transition-colors">{formatMoney(inv.total)}</td>
-                      <td className="p-4 text-right font-bold !text-rose-400 group-hover:!text-rose-400 transition-colors">{formatMoney(inv.balance)}</td>
+                      <td className="p-4 text-right font-bold !text-slate-200 group-hover:!text-black transition-colors">{formatMoney(inv.total)}</td>
+                      <td className="p-4 text-right font-bold !text-rose-400 group-hover:!text-red-600 transition-colors">{formatMoney(inv.balance)}</td>
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           
                           {/* PAY BUTTON DIRECTS TO PAYMENTS */}
                           {inv.status !== "DRAFT" && Number(inv.balance) > 0 && (
-                             <Link href={`/payments?invoiceId=${inv.id}`} className="!text-emerald-400 hover:!text-emerald-300 flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
+                             <Link href={`/payments?invoiceId=${inv.id}`} className="!text-emerald-400 group-hover:!text-emerald-600 hover:!text-emerald-800 flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
                                <CreditCard className="w-3 h-3" /> Pay
                              </Link>
                           )}
                           
                           {Number(inv.paid) === 0 && (
-                            <button onClick={() => openEditInvoice(inv)} className="!text-blue-400 hover:!text-blue-300 flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
+                            <button onClick={() => openEditInvoice(inv)} className="!text-blue-400 group-hover:!text-blue-600 hover:!text-blue-800 flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
                               <Edit className="w-3 h-3" /> Edit
                             </button>
                           )}
                           
-                          <Link href={`/sales/invoices/print/${inv.id}`} target="_blank" className="!text-slate-300 hover:!text-white flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
+                          <Link href={`/sales/invoices/print/${inv.id}`} target="_blank" className="!text-slate-300 group-hover:!text-slate-600 hover:!text-black flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors">
                             <Printer className="w-3 h-3" /> Print
                           </Link>
                         </div>
