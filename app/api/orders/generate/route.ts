@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     await prisma.$transaction(async (tx) => {
       
-      // Dynamic Web Invoice Numbering Logic
+      // Dynamic Web Invoice Numbering Logic (No leading zeros)
       const settings = await tx.companySettings.findUnique({ where: { companyId: order.companyId } });
       const prefix = (settings as any)?.webInvoicePrefix || "WEB-";
       const startNum = (settings as any)?.webInvoiceStartingNumber || 1;
@@ -46,7 +46,8 @@ export async function POST(req: Request) {
         if (!isNaN(parsed)) nextNum = parsed + 1;
       }
       
-      const invoiceNo = `${prefix}${String(nextNum).padStart(6, '0')}`;
+      // Removed .padStart() to ensure the number remains exactly as generated (e.g., WEB-1, WEB-2)
+      const invoiceNo = `${prefix}${nextNum}`;
       
       const deliveryCost = Number(deliveryFee) || 0;
       const orderTotal = Number(order.totalAmount) || 0;
