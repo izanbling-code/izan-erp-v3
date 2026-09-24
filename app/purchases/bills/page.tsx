@@ -79,19 +79,20 @@ export default function PurchaseBillsPage() {
 
   useEffect(() => { loadBills(); }, []);
 
+  // FIXED: Consolidated API Call to fetch all master data reliably
   useEffect(() => {
     if (allocatingBill) {
-      Promise.all([
-        fetch("/api/products").then(r => r.json()).catch(() => ({})),
-        fetch("/api/categories").then(r => r.json()).catch(() => ({})),
-        fetch("/api/brands").then(r => r.json()).catch(() => ({})),
-        fetch("/api/units").then(r => r.json()).catch(() => ({}))
-      ]).then(([p, c, b, u]) => {
-        setProducts(p.products || p.data || []);
-        setCategories(c.categories || c.data || []);
-        setBrands(b.brands || b.data || []);
-        setUnits(u.units || u.data || []);
-      });
+      fetch("/api/purchases/bills/allocate/master")
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok) {
+            setProducts(data.products || []);
+            setCategories(data.categories || []);
+            setBrands(data.brands || []);
+            setUnits(data.units || []);
+          }
+        })
+        .catch(err => console.error("Failed to load master data", err));
     }
   }, [allocatingBill]);
 
@@ -125,7 +126,21 @@ export default function PurchaseBillsPage() {
       if (l.id !== id) return l;
       const updated = { ...l, [field]: val };
       
-      if (field === "productId") { if (val === "NEW") { updated.isNewItem = true; updated.productId = ""; } else { updated.isNewItem = false; updated.name = ""; } }
+      // AUTO-FILL LOGIC: If selecting an existing product, grab its category, brand, and unit!
+      if (field === "productId") { 
+        if (val === "NEW") { 
+          updated.isNewItem = true; updated.productId = ""; updated.name = ""; 
+          updated.categoryId = ""; updated.brandId = ""; updated.unitId = "";
+        } else { 
+          updated.isNewItem = false; updated.name = ""; 
+          const selectedProduct = products.find(p => p.id === val);
+          if (selectedProduct) {
+            updated.categoryId = selectedProduct.categoryId || "";
+            updated.brandId = selectedProduct.brandId || "";
+            updated.unitId = selectedProduct.unitId || "";
+          }
+        } 
+      }
       if (field === "categoryId") { if (val === "NEW") { updated.isNewCat = true; updated.categoryId = ""; } else { updated.isNewCat = false; updated.newCatName = ""; } }
       if (field === "brandId") { if (val === "NEW") { updated.isNewBrand = true; updated.brandId = ""; } else { updated.isNewBrand = false; updated.newBrandName = ""; } }
       if (field === "unitId") { if (val === "NEW") { updated.isNewUnit = true; updated.unitId = ""; } else { updated.isNewUnit = false; updated.newUnitName = ""; } }
@@ -142,7 +157,6 @@ export default function PurchaseBillsPage() {
     }));
   }
 
-  // --- AMOUNT BALANCER MATH ---
   const itemsSubtotal = useMemo(() => allocLines.reduce((sum, l) => sum + (Number(l.totalCost) || 0), 0), [allocLines]);
   const calcDiscount = discountType === "PERCENT" ? (itemsSubtotal * (Number(discountVal) || 0)) / 100 : (Number(discountVal) || 0);
   const calcAdjustment = Number(adjustmentVal) || 0;
@@ -151,10 +165,8 @@ export default function PurchaseBillsPage() {
   const netAllocated = itemsSubtotal - calcDiscount + calcAdjustment + calcDelivery;
   const amountBalanceRemaining = targetTotal - netAllocated;
 
-  // --- WEIGHT BALANCER MATH ---
   const targetWeight = useMemo(() => {
     if (!allocatingBill || !allocatingBill.lines) return 0;
-    // We sum the original bill lines' quantity, which the Gram Conversion Engine already saved as total grams.
     return allocatingBill.lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
   }, [allocatingBill]);
 
