@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
 function generateBatchNumber() {
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
               unitId: finalUnitId || null,
               type: "GOODS",
               costPrice: cost,
-              salePrice: cost > 0 ? cost * 1.5 : 0, // Apply a default 50% markup for safety
+              salePrice: cost > 0 ? cost * 1.5 : 0, 
               sku
             }
           });
@@ -81,7 +81,6 @@ export async function POST(request: NextRequest) {
         const totalCost = Number(line.totalCost) || 0;
         const batchNum = (line.batchNo && line.batchNo.trim() !== "") ? line.batchNo.trim() : generateBatchNumber();
 
-        // Create Retail Batch
         const batch = await tx.inventoryBatch.create({
           data: {
             companyId: company.id,
@@ -95,12 +94,10 @@ export async function POST(request: NextRequest) {
           }
         });
 
-        // Add to Stock Batch
         await tx.stockBatch.create({
           data: { batchId: batch.id, productId: finalProductId, warehouseId, quantity: yieldQty }
         });
 
-        // Add to Main Stock & Recalculate Average Cost
         const existingStock = await tx.stock.findUnique({
           where: { productId_warehouseId: { productId: finalProductId, warehouseId } }
         });
@@ -120,15 +117,15 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // Log Inward Movement
+        // SMART FIX: Map type and referenceType strictly to "PURCHASE" to satisfy Prisma Enums
         await tx.inventoryMovement.create({
           data: {
             companyId: company.id,
             productId: finalProductId,
             batchId: batch.id,
             destinationWarehouseId: warehouseId,
-            type: "ADJUSTMENT",
-            referenceType: "REPACKAGING_IN",
+            type: "PURCHASE",
+            referenceType: "PURCHASE",
             referenceId: originalBill.id,
             quantity: yieldQty,
             unitCost: unitCost,
@@ -156,15 +153,15 @@ export async function POST(request: NextRequest) {
           data: { quantity: { decrement: qtyToDeduct } }
         });
 
-        // Log Outward Movement
+        // SMART FIX: Map deduction to "PURCHASE" with negative quantities
         await tx.inventoryMovement.create({
           data: {
             companyId: company.id,
             productId: oldLine.productId,
             batchId: oldLine.batchId,
             sourceWarehouseId: oldLine.warehouseId,
-            type: "ADJUSTMENT",
-            referenceType: "REPACKAGING_OUT",
+            type: "PURCHASE",
+            referenceType: "PURCHASE",
             referenceId: originalBill.id,
             quantity: -qtyToDeduct,
             unitCost: Number(oldLine.unitCost),
