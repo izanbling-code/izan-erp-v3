@@ -12,6 +12,7 @@ type PurchaseBill = {
   status: "DRAFT" | "POSTED" | "PARTIAL" | "PAID" | "VOID";
   total: number | string;
   balance: number | string;
+  notes: string | null;
   supplier: { name: string; };
   lines: any[];
 };
@@ -46,6 +47,7 @@ export default function PurchaseBillsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Allocation Modal State
   const [allocatingBill, setAllocatingBill] = useState<PurchaseBill | null>(null);
@@ -106,6 +108,9 @@ export default function PurchaseBillsPage() {
   }
 
   function openAllocation(bill: PurchaseBill) {
+    if (bill.notes?.includes("[REPACKAGED]")) {
+      return toast.error("This bill has already been allocated and repackaged.");
+    }
     setAllocatingBill(bill);
     setAllocLines([{ id: Math.random().toString(), isNewItem: false, productId: "", name: "", isNewCat: false, categoryId: "", newCatName: "", isNewBrand: false, brandId: "", newBrandName: "", isNewUnit: false, unitId: "", newUnitName: "", batchNo: "", yieldQty: "", weightGrams: "", unitCost: "", totalCost: "" }]);
     setCartonWeight(""); setDiscountVal(0); setAdjustmentVal(0); setDeliveryCharges(0); setDiscountType("FLAT");
@@ -120,7 +125,6 @@ export default function PurchaseBillsPage() {
       if (l.id !== id) return l;
       const updated = { ...l, [field]: val };
       
-      // Auto-Create Logic & Unit Cost Back-Calculation
       if (field === "productId") { if (val === "NEW") { updated.isNewItem = true; updated.productId = ""; } else { updated.isNewItem = false; updated.name = ""; } }
       if (field === "categoryId") { if (val === "NEW") { updated.isNewCat = true; updated.categoryId = ""; } else { updated.isNewCat = false; updated.newCatName = ""; } }
       if (field === "brandId") { if (val === "NEW") { updated.isNewBrand = true; updated.brandId = ""; } else { updated.isNewBrand = false; updated.newBrandName = ""; } }
@@ -138,13 +142,11 @@ export default function PurchaseBillsPage() {
     }));
   }
 
-  // FIXED MATH ENGINE: Force all values to strict Numbers to prevent string concatenation
   const itemsSubtotal = useMemo(() => allocLines.reduce((sum, l) => sum + (Number(l.totalCost) || 0), 0), [allocLines]);
   const calcDiscount = discountType === "PERCENT" ? (itemsSubtotal * (Number(discountVal) || 0)) / 100 : (Number(discountVal) || 0);
   const calcAdjustment = Number(adjustmentVal) || 0;
   const calcDelivery = Number(deliveryCharges) || 0;
   
-  // STRCT NUMBER CASTING FIX
   const targetTotal = Number(allocatingBill?.total || 0);
   const netAllocated = itemsSubtotal - calcDiscount + calcAdjustment + calcDelivery;
   const balanceRemaining = targetTotal - netAllocated;
@@ -153,8 +155,6 @@ export default function PurchaseBillsPage() {
     const totalWeight = allocLines.reduce((sum, l) => sum + (Number(l.weightGrams) || 0), 0);
     if (totalWeight <= 0) return toast.error("Enter weights for your items to distribute costs.");
     
-    // Distribute the exact amount needed for the items subtotal to balance the bill
-    // Needed Items Subtotal = Target Bill Total + Discount - Adjustment - Delivery
     const requiredSubtotal = targetTotal + calcDiscount - calcAdjustment - calcDelivery;
 
     setAllocLines(prev => prev.map(l => {
@@ -173,7 +173,40 @@ export default function PurchaseBillsPage() {
 
   async function submitAllocation() {
     if (Math.abs(balanceRemaining) > 0.05) return toast.error("Balance must be exactly Rs 0.00 before finalizing!");
-    toast.success("Allocation Payload Ready for backend.");
+    
+    // Final check for missing names on new items
+    for (const line of allocLines) {
+      if (line.isNewItem && (!line.name || line.name.trim() === "")) return toast.error("Please provide a name for all new items.");
+      if (Number(line.yieldQty) <= 0) return toast.error("Yield Quantity must be greater than zero for all items.");
+    }
+
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        billId: allocatingBill!.id,
+        allocations: allocLines,
+        adjustments: { discountVal, adjustmentVal, deliveryCharges, cartonWeight }
+      };
+
+      const res = await fetch("/api/purchases/bills/allocate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await res.json();
+      if (data.ok) {
+        toast.success("Stock repacked and allocated successfully!");
+        setAllocatingBill(null);
+        loadBills();
+      } else {
+        toast.error(data.error || "Failed to allocate stock.");
+      }
+    } catch (err) {
+      toast.error("Network error. Failed to reach the server.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -212,9 +245,14 @@ export default function PurchaseBillsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50">
-                    {bills.map((bill) => (
+                    {bills.map((bill) => {
+                      const isRepackaged = bill.notes?.includes("[REPACKAGED]");
+                      return (
                       <tr key={bill.id} className="hover:bg-white transition-colors group">
-                        <td className="p-4 font-bold text-white group-hover:text-black transition-colors">{bill.billNo}</td>
+                        <td className="p-4 font-bold text-white group-hover:text-black transition-colors">
+                          {bill.billNo}
+                          {isRepackaged && <span className="ml-2 text-[9px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-widest border border-purple-500/30">Repackaged</span>}
+                        </td>
                         <td className="p-4 text-slate-400 group-hover:text-black transition-colors">{new Date(bill.billDate).toISOString().slice(0, 10)}</td>
                         <td className="p-4 text-blue-400 group-hover:text-black transition-colors font-semibold">{bill.supplier?.name}</td>
                         <td className="p-4 text-right font-bold text-slate-200 group-hover:text-black transition-colors">{money(bill.total)}</td>
@@ -225,15 +263,18 @@ export default function PurchaseBillsPage() {
                           {bill.status === "DRAFT" && (
                             <button onClick={() => handleAction(bill.id, "POST")} disabled={actionLoading === bill.id} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] uppercase font-bold tracking-wider transition">Post</button>
                           )}
-                          {bill.status === "POSTED" && (
+                          {bill.status === "POSTED" && !isRepackaged && (
                             <>
                               <button onClick={() => openAllocation(bill)} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] uppercase font-bold tracking-wider transition shadow-lg shadow-blue-500/20">Allocate Stock</button>
                               <button onClick={() => handleAction(bill.id, "REVERSE")} disabled={actionLoading === bill.id} className="px-3 py-1 bg-slate-800 hover:bg-rose-600 text-rose-400 hover:text-white rounded text-[10px] uppercase font-bold tracking-wider transition">Reverse</button>
                             </>
                           )}
+                          {bill.status === "POSTED" && isRepackaged && (
+                             <span className="text-xs text-slate-500 italic">Locked</span>
+                          )}
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               )}
@@ -242,7 +283,7 @@ export default function PurchaseBillsPage() {
         </div>
       </ERPShell>
 
-      {/* ZERO-BALANCE ALLOCATION MODAL (DARK THEME) */}
+      {/* ZERO-BALANCE ALLOCATION MODAL */}
       {allocatingBill && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#131C2F] border border-slate-700 w-full max-w-[95vw] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-fade-in">
@@ -252,7 +293,7 @@ export default function PurchaseBillsPage() {
                 <h2 className="text-xl font-bold text-white">Stock Allocation & Re-Packaging</h2>
                 <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mt-1">Bill {allocatingBill.billNo} • Target Balance: {money(allocatingBill.total)}</p>
               </div>
-              <button onClick={() => setAllocatingBill(null)} className="text-slate-500 hover:text-white text-3xl transition">&times;</button>
+              <button onClick={() => setAllocatingBill(null)} disabled={isSubmitting} className="text-slate-500 hover:text-white text-3xl transition">&times;</button>
             </div>
 
             <div className="flex-1 overflow-auto p-4 md:p-6 custom-scrollbar">
@@ -274,8 +315,6 @@ export default function PurchaseBillsPage() {
                 <tbody className="divide-y divide-slate-800/50">
                   {allocLines.map((line) => (
                     <tr key={line.id} className="hover:bg-slate-800/30 transition-colors">
-                      
-                      {/* Item Name */}
                       <td className="py-2 px-1">
                         {line.isNewItem ? (
                           <div className="flex gap-1">
@@ -291,10 +330,8 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
                       
-                      {/* Batch */}
                       <td className="py-2 px-1"><input type="text" placeholder="Auto" value={line.batchNo} onChange={e => updateAllocLine(line.id, "batchNo", e.target.value)} className="w-full bg-white text-black border border-slate-300 rounded p-1.5 text-xs outline-none focus:border-blue-500" /></td>
                       
-                      {/* Category */}
                       <td className="py-2 px-1">
                         {line.isNewCat ? (
                           <div className="flex gap-1">
@@ -310,7 +347,6 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
 
-                      {/* Brand */}
                       <td className="py-2 px-1">
                         {line.isNewBrand ? (
                           <div className="flex gap-1">
@@ -326,7 +362,6 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
 
-                      {/* Unit */}
                       <td className="py-2 px-1">
                         {line.isNewUnit ? (
                           <div className="flex gap-1">
@@ -342,13 +377,11 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
 
-                      {/* Yield, Weight, Cost */}
                       <td className="py-2 px-1"><input type="number" min="0" value={line.yieldQty} onChange={e => updateAllocLine(line.id, "yieldQty", e.target.value)} className="w-full bg-white text-black border border-slate-300 rounded p-1.5 text-xs outline-none text-center focus:border-blue-500" /></td>
                       <td className="py-2 px-1"><input type="number" min="0" value={line.weightGrams} onChange={e => updateAllocLine(line.id, "weightGrams", e.target.value)} className="w-full bg-white text-black border border-slate-300 rounded p-1.5 text-xs outline-none text-center focus:border-blue-500" /></td>
                       <td className="py-2 px-1"><input type="number" min="0" value={line.unitCost} readOnly className="w-full bg-slate-100 text-slate-500 border border-slate-300 rounded p-1.5 text-xs outline-none text-right font-bold cursor-not-allowed" /></td>
                       <td className="py-2 px-1"><input type="number" min="0" value={line.totalCost} onChange={e => updateAllocLine(line.id, "totalCost", e.target.value)} className="w-full bg-blue-50 text-blue-800 border border-blue-300 rounded p-1.5 text-xs outline-none text-right font-bold focus:border-blue-500" /></td>
                       
-                      {/* Delete */}
                       <td className="py-2 px-1 text-center"><button onClick={() => setAllocLines(prev => prev.filter(l => l.id !== line.id))} className="text-rose-500 hover:text-rose-400 font-bold">&times;</button></td>
                     </tr>
                   ))}
@@ -357,10 +390,8 @@ export default function PurchaseBillsPage() {
               <button onClick={addAllocLine} className="mt-4 text-xs font-bold text-blue-400 hover:text-blue-300 uppercase tracking-widest">+ Add Row</button>
             </div>
 
-            {/* ENHANCED BALANCER & ADJUSTMENTS */}
             <div className="border-t border-slate-800 flex flex-col lg:flex-row gap-0">
               
-              {/* Adjustments Panel */}
               <div className="bg-[#0B1121] p-6 lg:w-1/3 border-r border-slate-800 space-y-4">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Adjustments & Extra Costs</h3>
                 
@@ -391,7 +422,6 @@ export default function PurchaseBillsPage() {
                 </button>
               </div>
 
-              {/* Zero-Balance Summary */}
               <div className="bg-[#131C2F] p-6 lg:w-2/3 flex flex-col justify-between">
                 <div className="flex flex-wrap justify-between items-end gap-4 bg-[#0B1121] p-4 rounded-xl border border-slate-800 mb-6">
                   <div>
@@ -418,8 +448,10 @@ export default function PurchaseBillsPage() {
                 </div>
 
                 <div className="flex justify-end gap-3">
-                  <button onClick={() => setAllocatingBill(null)} className="px-6 py-2.5 text-sm font-bold text-slate-400 hover:text-white bg-transparent hover:bg-slate-800 rounded-lg transition border border-transparent hover:border-slate-700">Cancel</button>
-                  <button onClick={submitAllocation} disabled={Math.abs(balanceRemaining) > 0.05} className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-lg shadow-blue-500/20 transition">Finalize Adjustment</button>
+                  <button onClick={() => setAllocatingBill(null)} disabled={isSubmitting} className="px-6 py-2.5 text-sm font-bold text-slate-400 hover:text-white bg-transparent hover:bg-slate-800 rounded-lg transition border border-transparent hover:border-slate-700">Cancel</button>
+                  <button onClick={submitAllocation} disabled={isSubmitting || Math.abs(balanceRemaining) > 0.05} className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-lg shadow-blue-500/20 transition">
+                    {isSubmitting ? "Finalizing..." : "Finalize Adjustment"}
+                  </button>
                 </div>
               </div>
 
