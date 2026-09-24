@@ -142,24 +142,35 @@ export default function PurchaseBillsPage() {
     }));
   }
 
+  // --- AMOUNT BALANCER MATH ---
   const itemsSubtotal = useMemo(() => allocLines.reduce((sum, l) => sum + (Number(l.totalCost) || 0), 0), [allocLines]);
   const calcDiscount = discountType === "PERCENT" ? (itemsSubtotal * (Number(discountVal) || 0)) / 100 : (Number(discountVal) || 0);
   const calcAdjustment = Number(adjustmentVal) || 0;
   const calcDelivery = Number(deliveryCharges) || 0;
-  
   const targetTotal = Number(allocatingBill?.total || 0);
   const netAllocated = itemsSubtotal - calcDiscount + calcAdjustment + calcDelivery;
-  const balanceRemaining = targetTotal - netAllocated;
+  const amountBalanceRemaining = targetTotal - netAllocated;
+
+  // --- WEIGHT BALANCER MATH ---
+  const targetWeight = useMemo(() => {
+    if (!allocatingBill || !allocatingBill.lines) return 0;
+    // We sum the original bill lines' quantity, which the Gram Conversion Engine already saved as total grams.
+    return allocatingBill.lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
+  }, [allocatingBill]);
+
+  const allocatedItemsWeight = useMemo(() => allocLines.reduce((sum, l) => sum + (Number(l.weightGrams) || 0), 0), [allocLines]);
+  const totalAllocatedWeight = allocatedItemsWeight + (Number(cartonWeight) || 0);
+  const weightBalanceRemaining = targetWeight - totalAllocatedWeight;
 
   function autoDistributeCosts() {
-    const totalWeight = allocLines.reduce((sum, l) => sum + (Number(l.weightGrams) || 0), 0);
-    if (totalWeight <= 0) return toast.error("Enter weights for your items to distribute costs.");
+    if (allocatedItemsWeight <= 0) return toast.error("Enter weights for your items to distribute costs.");
+    if (Math.abs(weightBalanceRemaining) > 0.5) return toast.error(`Please balance the physical weight first! You have an unallocated variance of ${weightBalanceRemaining}g.`);
     
     const requiredSubtotal = targetTotal + calcDiscount - calcAdjustment - calcDelivery;
 
     setAllocLines(prev => prev.map(l => {
       const weight = Number(l.weightGrams) || 0;
-      const proportion = weight / totalWeight;
+      const proportion = weight / allocatedItemsWeight;
       const assignedCost = requiredSubtotal * proportion;
       const qty = Number(l.yieldQty) || 0;
       return { 
@@ -172,9 +183,9 @@ export default function PurchaseBillsPage() {
   }
 
   async function submitAllocation() {
-    if (Math.abs(balanceRemaining) > 0.05) return toast.error("Balance must be exactly Rs 0.00 before finalizing!");
+    if (Math.abs(amountBalanceRemaining) > 0.05) return toast.error("Amount Balance must be exactly Rs 0.00 before finalizing!");
+    if (Math.abs(weightBalanceRemaining) > 0.5) return toast.error("Physical Weight must be perfectly balanced before finalizing!");
     
-    // Final check for missing names on new items
     for (const line of allocLines) {
       if (line.isNewItem && (!line.name || line.name.trim() === "")) return toast.error("Please provide a name for all new items.");
       if (Number(line.yieldQty) <= 0) return toast.error("Yield Quantity must be greater than zero for all items.");
@@ -291,7 +302,7 @@ export default function PurchaseBillsPage() {
             <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-[#0B1121]">
               <div>
                 <h2 className="text-xl font-bold text-white">Stock Allocation & Re-Packaging</h2>
-                <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mt-1">Bill {allocatingBill.billNo} • Target Balance: {money(allocatingBill.total)}</p>
+                <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mt-1">Bill {allocatingBill.billNo} • Target Purchase: {targetWeight}g / {money(targetTotal)}</p>
               </div>
               <button onClick={() => setAllocatingBill(null)} disabled={isSubmitting} className="text-slate-500 hover:text-white text-3xl transition">&times;</button>
             </div>
@@ -378,7 +389,7 @@ export default function PurchaseBillsPage() {
                       </td>
 
                       <td className="py-2 px-1"><input type="number" min="0" value={line.yieldQty} onChange={e => updateAllocLine(line.id, "yieldQty", e.target.value)} className="w-full bg-white text-black border border-slate-300 rounded p-1.5 text-xs outline-none text-center focus:border-blue-500" /></td>
-                      <td className="py-2 px-1"><input type="number" min="0" value={line.weightGrams} onChange={e => updateAllocLine(line.id, "weightGrams", e.target.value)} className="w-full bg-white text-black border border-slate-300 rounded p-1.5 text-xs outline-none text-center focus:border-blue-500" /></td>
+                      <td className="py-2 px-1"><input type="number" min="0" value={line.weightGrams} onChange={e => updateAllocLine(line.id, "weightGrams", e.target.value)} className="w-full bg-amber-50 text-amber-900 border border-amber-300 rounded p-1.5 text-xs outline-none text-center focus:border-amber-500 font-bold" /></td>
                       <td className="py-2 px-1"><input type="number" min="0" value={line.unitCost} readOnly className="w-full bg-slate-100 text-slate-500 border border-slate-300 rounded p-1.5 text-xs outline-none text-right font-bold cursor-not-allowed" /></td>
                       <td className="py-2 px-1"><input type="number" min="0" value={line.totalCost} onChange={e => updateAllocLine(line.id, "totalCost", e.target.value)} className="w-full bg-blue-50 text-blue-800 border border-blue-300 rounded p-1.5 text-xs outline-none text-right font-bold focus:border-blue-500" /></td>
                       
@@ -413,8 +424,8 @@ export default function PurchaseBillsPage() {
                 </div>
                 
                 <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-800">
-                  <span className="text-slate-400">Carton/Scrap Wt. (g)</span>
-                  <input type="number" min="0" placeholder="e.g. 1500" value={cartonWeight} onChange={e => setCartonWeight(e.target.value)} className="w-24 bg-white text-black rounded px-2 py-1 outline-none text-right focus:border-blue-500" />
+                  <span className="text-amber-500 font-bold">Carton/Scrap Wt. (g)</span>
+                  <input type="number" min="0" placeholder="e.g. 1500" value={cartonWeight} onChange={e => setCartonWeight(e.target.value)} className="w-24 bg-amber-50 text-amber-900 border border-amber-300 rounded px-2 py-1 outline-none text-right font-bold focus:border-amber-500" />
                 </div>
                 
                 <button onClick={autoDistributeCosts} className="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 rounded-lg py-2 text-xs font-bold uppercase tracking-widest transition">
@@ -423,33 +434,66 @@ export default function PurchaseBillsPage() {
               </div>
 
               <div className="bg-[#131C2F] p-6 lg:w-2/3 flex flex-col justify-between">
-                <div className="flex flex-wrap justify-between items-end gap-4 bg-[#0B1121] p-4 rounded-xl border border-slate-800 mb-6">
-                  <div>
-                    <div className="text-[10px] font-bold uppercase text-slate-500">Target Bill Total</div>
-                    <div className="text-lg font-black text-white">{money(targetTotal)}</div>
+                
+                <div className="flex flex-col gap-3 mb-6">
+                  {/* WEIGHT BALANCER ROW */}
+                  <div className="flex flex-wrap justify-between items-end gap-4 bg-[#0B1121] p-3 rounded-xl border border-slate-800">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-500">Target Bulk Weight</div>
+                      <div className="text-lg font-black text-white">{targetWeight} g</div>
+                    </div>
+                    <div className="text-slate-700 text-xl font-light">-</div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-500">Allocated Wt.</div>
+                      <div className="text-lg font-black text-amber-500">{allocatedItemsWeight} g</div>
+                    </div>
+                    <div className="text-slate-700 text-xl font-light">-</div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-500">Carton Wt.</div>
+                      <div className="text-lg font-black text-slate-400">{Number(cartonWeight) || 0} g</div>
+                    </div>
+                    <div className="text-slate-700 text-xl font-light">=</div>
+                    <div className="bg-[#131C2F] px-4 py-1.5 rounded-lg border border-slate-800">
+                      <div className="text-[10px] font-bold uppercase text-slate-500">Weight Balance</div>
+                      <div className={`text-lg font-black ${Math.abs(weightBalanceRemaining) < 0.5 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                        {weightBalanceRemaining} g
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-slate-700 text-xl font-light">-</div>
-                  <div>
-                    <div className="text-[10px] font-bold uppercase text-slate-500">Items Subtotal</div>
-                    <div className="text-lg font-black text-blue-400">{money(itemsSubtotal)}</div>
-                  </div>
-                  <div className="text-slate-700 text-xl font-light">+/-</div>
-                  <div>
-                    <div className="text-[10px] font-bold uppercase text-slate-500">Adj. & Delivery</div>
-                    <div className="text-lg font-black text-slate-300">{money(calcAdjustment + calcDelivery - calcDiscount)}</div>
-                  </div>
-                  <div className="text-slate-700 text-xl font-light">=</div>
-                  <div className="bg-[#131C2F] px-4 py-2 rounded-lg border border-slate-800">
-                    <div className="text-[10px] font-bold uppercase text-slate-500">Unallocated Balance</div>
-                    <div className={`text-xl font-black ${Math.abs(balanceRemaining) < 0.05 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                      {money(balanceRemaining)}
+
+                  {/* AMOUNT BALANCER ROW */}
+                  <div className="flex flex-wrap justify-between items-end gap-4 bg-[#0B1121] p-3 rounded-xl border border-slate-800">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-500">Target Bill Total</div>
+                      <div className="text-lg font-black text-white">{money(targetTotal)}</div>
+                    </div>
+                    <div className="text-slate-700 text-xl font-light">-</div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-500">Items Subtotal</div>
+                      <div className="text-lg font-black text-blue-400">{money(itemsSubtotal)}</div>
+                    </div>
+                    <div className="text-slate-700 text-xl font-light">+/-</div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-500">Adj. & Delivery</div>
+                      <div className="text-lg font-black text-slate-300">{money(calcAdjustment + calcDelivery - calcDiscount)}</div>
+                    </div>
+                    <div className="text-slate-700 text-xl font-light">=</div>
+                    <div className="bg-[#131C2F] px-4 py-1.5 rounded-lg border border-slate-800">
+                      <div className="text-[10px] font-bold uppercase text-slate-500">Amount Balance</div>
+                      <div className={`text-lg font-black ${Math.abs(amountBalanceRemaining) < 0.05 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                        {money(amountBalanceRemaining)}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex justify-end gap-3">
                   <button onClick={() => setAllocatingBill(null)} disabled={isSubmitting} className="px-6 py-2.5 text-sm font-bold text-slate-400 hover:text-white bg-transparent hover:bg-slate-800 rounded-lg transition border border-transparent hover:border-slate-700">Cancel</button>
-                  <button onClick={submitAllocation} disabled={isSubmitting || Math.abs(balanceRemaining) > 0.05} className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-lg shadow-blue-500/20 transition">
+                  <button 
+                    onClick={submitAllocation} 
+                    disabled={isSubmitting || Math.abs(amountBalanceRemaining) > 0.05 || Math.abs(weightBalanceRemaining) > 0.5} 
+                    className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-lg shadow-blue-500/20 transition"
+                  >
                     {isSubmitting ? "Finalizing..." : "Finalize Adjustment"}
                   </button>
                 </div>
