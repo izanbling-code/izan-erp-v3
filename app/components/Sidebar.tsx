@@ -1,141 +1,158 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { 
+  LayoutDashboard, ShoppingCart, Store, 
+  FileText, Users, CreditCard,
+  ShoppingBag, Truck, Receipt,
+  Package, Layers, ArrowRightLeft,
+  BookOpen, Landmark, BookMarked, Wallet,
+  BarChart3, Calendar, Settings, Shield, Server,
+  LogOut
+} from "lucide-react";
 
-const navigation = [
-  { section: "Overview", items: [ { label: "Dashboard", href: "/", icon: "⊞" } ] },
-  { section: "Receivables", items: [ { label: "Invoices", href: "/sales/invoices", icon: "📄" }, { label: "Customers", href: "/sales/customers", icon: "👥" }, { label: "Incoming Funds", href: "/sales/payments", icon: "📥" } ] },
-  { section: "Payables", items: [ { label: "Purchase Bills", href: "/purchases/bills", icon: "🧾" }, { label: "Suppliers", href: "/purchases/suppliers", icon: "🏢" }, { label: "Disbursements", href: "/purchases/payables", icon: "📤" } ] },
-  { section: "Treasury", items: [ { label: "Bank Directory", href: "/accounting/banking", icon: "🏦" }, { label: "Cash Book", href: "/accounting/cashbook", icon: "💵" }, { label: "Chart of Accounts", href: "/accounting/accounts", icon: "📊" }, { label: "Journal Entries", href: "/accounting/journals", icon: "⚖️" } ] },
-  { section: "Operations", items: [ { label: "Inventory Master", href: "/inventory/products", icon: "📦" }, { label: "Stock Ledger", href: "/inventory/stock", icon: "📋" }, { label: "Warehouses", href: "/inventory/warehouses", icon: "🏭" } ] },
-  { section: "Intelligence", items: [ { label: "Financial Reports", href: "/reports", icon: "📈" }, { label: "Month-End Close", href: "/accounting/closings", icon: "🔒" } ] },
-  { section: "Administration", items: [ { label: "System Settings", href: "/settings", icon: "⚙️" }, { label: "User Access", href: "/settings/users", icon: "🛡️" } ] },
+const menuGroups = [
+  {
+    label: "Main",
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { name: "Quick Order", href: "/quick-order", icon: ShoppingCart },
+      { name: "Shop", href: "/shop/admin", icon: Store },
+    ]
+  },
+  {
+    label: "Sales",
+    items: [
+      { name: "Invoices", href: "/sales/invoices", icon: FileText },
+      { name: "Customers", href: "/sales/customers", icon: Users },
+      { name: "Sales Payments", href: "/sales/payments", icon: CreditCard },
+    ]
+  },
+  {
+    label: "Purchases",
+    items: [
+      { name: "Purchase Bills", href: "/purchases/bills", icon: ShoppingBag },
+      { name: "Suppliers", href: "/purchases/suppliers", icon: Truck },
+      { name: "Payables", href: "/purchases/payables", icon: Receipt },
+    ]
+  },
+  {
+    label: "Inventory",
+    items: [
+      { name: "Products", href: "/inventory/products", icon: Package },
+      { name: "Stock & Warehouses", href: "/inventory/stock", icon: Layers },
+      { name: "Movements", href: "/inventory/movements", icon: ArrowRightLeft },
+    ]
+  },
+  {
+    label: "Finance",
+    items: [
+      { name: "Chart of Accounts", href: "/accounting/accounts", icon: BookOpen },
+      { name: "Banking & Cash", href: "/accounting/banking", icon: Landmark },
+      { name: "Journals", href: "/accounting/journals", icon: BookMarked },
+      { name: "Payments", href: "/payments", icon: Wallet },
+    ]
+  },
+  {
+    label: "Analytics & Misc",
+    items: [
+      { name: "Reports", href: "/reports", icon: BarChart3 },
+      { name: "Events", href: "/events", icon: Calendar },
+    ]
+  },
+  {
+    label: "System",
+    items: [
+      { name: "Users & Roles", href: "/settings/users", icon: Shield },
+      { name: "General Settings", href: "/settings", icon: Settings },
+      { name: "System Admin", href: "/admin/system", icon: Server },
+    ]
+  }
 ];
-
-const flatLinks = navigation.flatMap(g => g.items);
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
 
-  const initialIndex = flatLinks.findIndex(item => item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`));
-  const [selectedIndex, setSelectedIndex] = useState(initialIndex >= 0 ? initialIndex : 0);
-
-  useEffect(() => {
-    const currentIndex = flatLinks.findIndex(item => item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`));
-    if (currentIndex >= 0) setSelectedIndex(currentIndex);
-  }, [pathname]);
-
-  useEffect(() => {
-    const activeElement = document.getElementById(`sidebar-link-${selectedIndex}`);
-    if (activeElement) {
-      activeElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  }, [selectedIndex]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
-      // Surrender standard arrows to the data grid if one is on screen (Hold Ctrl to force sidebar)
-      if (document.querySelector('.erp-data-table') && !e.ctrlKey) return;
-      if (e.altKey || e.ctrlKey) return;
-
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev < flatLinks.length - 1 ? prev + 1 : prev));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : 0));
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        router.push(flatLinks[selectedIndex].href);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedIndex, router]);
-
-  let globalItemIndex = 0;
+  if (pathname === "/login" || pathname === "/unauthorized") return null;
 
   return (
-    <aside className="relative overflow-hidden flex flex-col h-screen bg-zinc-950/80 backdrop-blur-2xl border-r border-white/5" style={{ width: "260px" }}>
-      <style>{`
-        .bank-nav-item {
-          display: flex; align-items: center; padding: 10px 16px; margin: 2px 12px;
-          border-radius: 8px; color: #a1a1aa; font-size: 0.85rem; font-weight: 600;
-          text-decoration: none; transition: all 0.2s ease; border-left: 3px solid transparent;
-        }
-        .bank-nav-item:hover { background-color: rgba(255, 255, 255, 0.05); color: #f4f4f5; }
-        .bank-nav-item.active { 
-          background-color: rgba(20, 184, 166, 0.15); 
-          color: #5eead4; 
-          border-left: 3px solid #2dd4bf; 
-          box-shadow: inset 0 0 12px rgba(20, 184, 166, 0.05);
-        }
-        .bank-nav-item.keyboard-focus {
-          outline: 2px solid #2dd4bf !important;
-          outline-offset: -1px;
-          background-color: rgba(255, 255, 255, 0.1) !important;
-          color: #ffffff;
-        }
-        .bank-nav-section {
-          padding: 18px 16px 6px 20px; font-size: 0.65rem; text-transform: uppercase;
-          letter-spacing: 0.08em; font-weight: 800; color: #52525b;
-        }
-        .erp-navigation::-webkit-scrollbar { display: none; }
-      `}</style>
-
+    <aside className="w-64 hidden md:flex flex-col bg-zinc-950/80 backdrop-blur-2xl border-r border-white/5 h-screen font-sans">
+      
       {/* Brand Header */}
-      <div className="shrink-0 flex items-center gap-3 px-5 py-6 border-b border-white/5 bg-zinc-950/30">
-        <div style={{ background: "linear-gradient(135deg, #009b9b 0%, #004e54 100%)", color: "white", width: 36, height: 36, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "900", fontSize: "16px", boxShadow: "0 4px 12px rgba(0,155,155,0.4)", border: "1px solid rgba(255,255,255,0.1)" }}>
-          IB
-        </div>
-        <div>
-          <div style={{ color: "#ffffff", fontWeight: 800, fontSize: "1.1rem", letterSpacing: "-0.02em", lineHeight: 1.1, textShadow: "0 2px 4px rgba(0,0,0,0.5)" }}>IZAN BLING</div>
-          <div style={{ color: "#009b9b", fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Corporate Ledger</div>
+      <div className="h-20 flex items-center px-8 border-b border-white/5 bg-zinc-950/30 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#009b9b] to-[#004e54] flex items-center justify-center font-bold text-white shadow-[0_4px_12px_rgba(0,155,155,0.4)] border border-white/10">
+            IB
+          </div>
+          <span className="text-lg font-black tracking-widest text-white uppercase drop-shadow-sm">
+            Izan Bling
+          </span>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="erp-navigation pb-20 flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-        {navigation.map((group, index) => (
-          <div key={group?.section || index}>
-            <div className="bank-nav-section">{group?.section}</div>
-            {group?.items?.map((item) => {
-              const currentGlobalIndex = globalItemIndex++;
-              const isMouseActive = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
-              const isKeyboardFocused = currentGlobalIndex === selectedIndex;
-
-              return (
-                <Link
-                  key={item.href}
-                  id={`sidebar-link-${currentGlobalIndex}`}
-                  href={item.href}
-                  className={`bank-nav-item ${isMouseActive ? "active" : ""} ${isKeyboardFocused ? "keyboard-focus" : ""}`}
-                >
-                  <span style={{ marginRight: 12, fontSize: "1.1rem", opacity: isMouseActive ? 1 : 0.7 }}>{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
+      <nav className="flex-1 px-3 py-6 space-y-5 overflow-y-auto custom-scrollbar">
+        {menuGroups.map((group) => (
+          <div key={group.label}>
+            <p className="px-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">
+              {group.label}
+            </p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                const Icon = item.icon;
+                
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group text-sm ${
+                      isActive 
+                        ? "bg-teal-500/10 text-teal-400 font-bold border border-teal-500/20 shadow-[inset_0_0_12px_rgba(20,184,166,0.05)]" 
+                        : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200 font-medium border border-transparent"
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isActive ? "text-teal-400" : "text-zinc-500 group-hover:text-zinc-300"}`} />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         ))}
       </nav>
 
       {/* Footer */}
-      <div className="shrink-0 mt-auto border-t border-white/5 p-4 bg-zinc-950/50 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#a1a1aa", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700 }}>AD</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: "#f4f4f5", fontSize: "0.8rem", fontWeight: 700 }}>Administrator</div>
-            <div style={{ color: "#52525b", fontSize: "0.65rem", fontWeight: 600 }}>Active Session</div>
+      <div className="p-4 border-t border-white/5 bg-zinc-950/50 backdrop-blur-md shrink-0 space-y-3">
+        <div className="bg-white/5 p-3 rounded-xl border border-white/5 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 font-bold shrink-0">
+            A
+          </div>
+          <div className="overflow-hidden flex-1">
+            <p className="text-sm font-bold text-white truncate">Admin User</p>
+            <p className="text-xs text-zinc-500 truncate">admin@izan.com</p>
           </div>
         </div>
+        <a 
+          href="/api/auth/logout"
+          className="flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-rose-500/10 border border-white/5 hover:border-rose-500/30 text-zinc-400 hover:text-rose-400 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
+        >
+          <LogOut className="w-4 h-4" />
+          Log Out
+        </a>
       </div>
+      
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); }
+      `}} />
     </aside>
   );
+}
+
+export function ERPShell({ children }: { children: React.ReactNode }) {
+  return <div className="w-full h-full">{children}</div>;
 }
