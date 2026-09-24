@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Toaster, toast } from "react-hot-toast";
+import { Plus, Trash2, ArrowLeft, Layers, ShoppingBag, Calculator } from "lucide-react";
+import ERPShell from "@/app/components/erp-shell";
 
 type Supplier = { id: string; name: string; };
 type Product = { id: string; name: string; sku?: string | null; };
@@ -10,7 +13,7 @@ type Warehouse = { id: string; name: string; };
 type PurchaseLine = {
   id: string;
   productId: string;
-  uom: "PIECES" | "KG"; // <-- The magic toggle
+  uom: "PIECES" | "KG";
   quantity: string;
   unitCost: string;
   discount: string;
@@ -38,10 +41,6 @@ function makeLine(): PurchaseLine {
 function formatAmount(value: number) {
   return value.toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
-const inputStyle: React.CSSProperties = { width: "100%", padding: "10px 12px", border: "1px solid #d8dee8", borderRadius: "8px", background: "#ffffff", color: "#172033", fontSize: "14px", outline: "none", boxSizing: "border-box" };
-const labelStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: "7px", fontSize: "13px", fontWeight: 600, color: "#344054" };
-const sectionStyle: React.CSSProperties = { background: "#ffffff", border: "1px solid #e4e8ef", borderRadius: "14px", boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)", overflow: "hidden" };
 
 export default function NewPurchaseBillPage() {
   const router = useRouter();
@@ -117,7 +116,7 @@ export default function NewPurchaseBillPage() {
 
   async function saveBill(status: "DRAFT" | "POSTED") {
     const validationError = validateForm();
-    if (validationError) { setError(validationError); return; }
+    if (validationError) { setError(validationError); toast.error(validationError); return; }
 
     try {
       setSaving(true);
@@ -125,7 +124,7 @@ export default function NewPurchaseBillPage() {
 
       const payload = {
         supplierId,
-        billNo: billNo.trim() || "AUTO", // Tell API to auto-generate if empty
+        billNo: billNo.trim() || "AUTO",
         billDate,
         dueDate: dueDate || null,
         status,
@@ -149,123 +148,201 @@ export default function NewPurchaseBillPage() {
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Failed to save purchase bill");
 
+      toast.success("Purchase bill saved successfully!");
       router.push("/purchases/bills");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save purchase bill");
+      const msg = err instanceof Error ? err.message : "Failed to save purchase bill";
+      setError(msg);
+      toast.error(msg);
     } finally { setSaving(false); }
   }
 
-  if (loadingData) return <div className="dashboard" style={{ maxWidth: "1380px", margin: "0 auto" }}>Loading...</div>;
+  if (loadingData) return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-300 flex items-center justify-center font-sans antialiased">
+      <div className="text-teal-400 font-medium animate-pulse text-lg">Loading purchase module...</div>
+    </div>
+  );
 
   return (
-    <div className="dashboard" style={{ maxWidth: "1380px", margin: "0 auto", paddingBottom: "40px" }}>
-      <div className="dashboard-heading" style={{ marginBottom: "24px" }}>
-        <div>
-          <p className="eyebrow" style={{ color: "#6b7280", fontWeight: 700, letterSpacing: "0.08em" }}>PURCHASES / BILLS / NEW</p>
-          <h1 style={{ marginBottom: "6px", color: "#172033" }}>New Purchase Bill</h1>
-          <p className="dashboard-description">Record a supplier purchase and optionally convert KGs into Grams.</p>
-        </div>
-        <button type="button" onClick={() => router.push("/purchases/bills")} style={{ border: "1px solid #d8dee8", background: "#ffffff", color: "#344054", padding: "10px 16px", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: 600 }}>Back</button>
-      </div>
+    <div className="min-h-screen bg-zinc-950 text-zinc-300 font-sans antialiased relative overflow-hidden">
+      
+      {/* Ambient Glassmorphism Lights */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-teal-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none"></div>
 
-      {error && <div style={{ marginBottom: "18px", padding: "13px 16px", borderRadius: "9px", border: "1px solid #fecaca", background: "#fff1f2", color: "#b42318", fontSize: "14px", fontWeight: 500 }}>{error}</div>}
+      <Toaster position="top-right" />
+      <ERPShell title="New Purchase Bill">
+        <div className="max-w-7xl mx-auto p-8 space-y-6 relative z-10">
+          
+          {/* Header */}
+          <div className="flex justify-between items-center bg-gradient-to-r from-[#004e54]/80 to-[#009b9b]/80 backdrop-blur-xl p-6 rounded-2xl shadow-2xl border border-white/10">
+            <div>
+              <p className="!text-teal-200 text-xs font-bold uppercase tracking-widest">Purchases / Bills / New</p>
+              <h1 className="text-2xl font-bold !text-white tracking-tight mt-1 drop-shadow-sm">New Purchase Bill</h1>
+              <p className="!text-teal-50 mt-1 text-sm opacity-90 drop-shadow-sm">Record a supplier purchase and optionally convert KGs into Grams.</p>
+            </div>
+            <button type="button" onClick={() => router.push("/purchases/bills")} className="bg-white/10 hover:bg-white/20 backdrop-blur-md !text-white border border-white/20 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" /> Back
+            </button>
+          </div>
 
-      <section style={sectionStyle}>
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid #edf0f5", background: "#fbfcfe" }}>
-          <p style={{ margin: 0, color: "#7b61a8", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>PURCHASE</p>
-          <h2 style={{ margin: "5px 0 0", color: "#172033", fontSize: "19px" }}>Bill Details</h2>
-        </div>
-        <div style={{ padding: "24px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" }}>
-          <label style={labelStyle}><span>Supplier *</span>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} style={inputStyle}>
-              <option value="">Select supplier</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
-          <label style={labelStyle}><span>Supplier Bill No.</span>
-            <input type="text" value={billNo} onChange={(e) => setBillNo(e.target.value)} placeholder="Leave empty to auto-generate (PB-)" style={inputStyle} />
-          </label>
-          <label style={labelStyle}><span>Bill Date *</span>
-            <input type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} style={inputStyle} />
-          </label>
-          <label style={labelStyle}><span>Due Date</span>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
-          </label>
-        </div>
-      </section>
+          {error && <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 backdrop-blur-md !text-rose-400 text-sm font-medium shadow-sm">{error}</div>}
 
-      <section style={{ ...sectionStyle, marginTop: "20px" }}>
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid #edf0f5", background: "#fbfcfe", display: "flex", justifyContent: "space-between" }}>
-          <div><h2 style={{ margin: "5px 0 0", color: "#172033", fontSize: "19px" }}>Purchase Items</h2></div>
-          <button type="button" onClick={addLine} style={{ border: "none", background: "#7b61a8", color: "#ffffff", padding: "10px 15px", borderRadius: "8px", cursor: "pointer", fontWeight: 700 }}>+ Add Item</button>
-        </div>
-        <div style={{ overflowX: "auto", padding: "0 24px" }}>
-          <table className="erp-data-table">
-            <thead>
-              <tr style={{ borderBottom: "1px solid #e4e8ef" }}>
-                {["Product", "Batch No.", "Buy In", "Qty", "Cost", "Disc.", "Tax", "Warehouse", "Total", ""].map((h) => (
-                  <th key={h} style={{ padding: "13px 8px", textAlign: "left", color: "#667085", fontSize: "11px", fontWeight: 800 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => {
-                const quantity = Number(line.quantity) || 0;
-                const unitCost = Number(line.unitCost) || 0;
-                const discount = Number(line.discount) || 0;
-                const tax = Number(line.tax) || 0;
-                const lineTotal = quantity * unitCost - discount + tax;
+          {/* Bill Details Section */}
+          <section className="bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/5 overflow-hidden">
+            <div className="p-6 border-b border-white/5 bg-zinc-950/30 flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4 text-teal-400" />
+              <h2 className="text-lg font-bold !text-white tracking-tight">Bill Details</h2>
+            </div>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <label className="flex flex-col gap-2 text-sm font-semibold !text-zinc-300">
+                <span>Supplier *</span>
+                <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 outline-none transition-all shadow-inner">
+                  <option value="" className="bg-zinc-900">Select supplier</option>
+                  {suppliers.map((s) => <option key={s.id} value={s.id} className="bg-zinc-900">{s.name}</option>)}
+                </select>
+              </label>
 
-                return (
-                  <tr key={line.id} style={{ borderBottom: "1px solid #edf0f5" }}>
-                    <td><select value={line.productId} onChange={(e) => updateLine(line.id, "productId", e.target.value)} style={{...inputStyle, width: "160px"}}><option value="">Select...</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></td>
-                    <td><input type="text" value={line.batchNumber} onChange={(e) => updateLine(line.id, "batchNumber", e.target.value)} placeholder="Auto" style={{...inputStyle, width: "80px"}} /></td>
-                    <td>
-                      <select value={line.uom} onChange={(e) => updateLine(line.id, "uom", e.target.value)} style={{...inputStyle, width: "100px", fontWeight: "bold", color: "#7b61a8"}}>
-                        <option value="PIECES">Pieces</option>
-                        <option value="KG">KGs</option>
-                      </select>
-                    </td>
-                    <td><input type="number" min="0" step="0.01" value={line.quantity} onChange={(e) => updateLine(line.id, "quantity", e.target.value)} style={{...inputStyle, width: "80px"}} /></td>
-                    <td><input type="number" min="0" step="0.01" value={line.unitCost} onChange={(e) => updateLine(line.id, "unitCost", e.target.value)} style={{...inputStyle, width: "90px"}} /></td>
-                    <td><input type="number" min="0" step="0.01" value={line.discount} onChange={(e) => updateLine(line.id, "discount", e.target.value)} style={{...inputStyle, width: "80px"}} /></td>
-                    <td><input type="number" min="0" step="0.01" value={line.tax} onChange={(e) => updateLine(line.id, "tax", e.target.value)} style={{...inputStyle, width: "80px"}} /></td>
-                    <td><select value={line.warehouseId} onChange={(e) => updateLine(line.id, "warehouseId", e.target.value)} style={{...inputStyle, width: "120px"}}><option value="">Select...</option>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></td>
-                    <td style={{ padding: "12px 8px", whiteSpace: "nowrap" }}><strong>{formatAmount(lineTotal)}</strong></td>
-                    <td><button type="button" onClick={() => removeLine(line.id)} disabled={lines.length === 1} style={{ border: "none", background: "transparent", color: lines.length === 1 ? "#98a2b3" : "#d92d20", cursor: lines.length === 1 ? "default" : "pointer", fontWeight: 700 }}>X</button></td>
+              <label className="flex flex-col gap-2 text-sm font-semibold !text-zinc-300">
+                <span>Supplier Bill No.</span>
+                <input type="text" value={billNo} onChange={(e) => setBillNo(e.target.value)} placeholder="Leave empty to auto-generate (PB-)" className="w-full !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 outline-none transition-all placeholder-zinc-500 shadow-inner" />
+              </label>
+
+              <label className="flex flex-col gap-2 text-sm font-semibold !text-zinc-300">
+                <span>Bill Date *</span>
+                <input type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 outline-none transition-all shadow-inner" />
+              </label>
+
+              <label className="flex flex-col gap-2 text-sm font-semibold !text-zinc-300">
+                <span>Due Date</span>
+                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 outline-none transition-all shadow-inner" />
+              </label>
+            </div>
+          </section>
+
+          {/* Purchase Items Section */}
+          <section className="bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/5 overflow-hidden">
+            <div className="p-6 border-b border-white/5 bg-zinc-950/30 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-teal-400" />
+                <h2 className="text-lg font-bold !text-white tracking-tight">Purchase Items</h2>
+              </div>
+              <button type="button" onClick={addLine} className="bg-teal-600/80 hover:bg-teal-500 backdrop-blur-md !text-white border border-teal-500/50 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm flex items-center gap-1.5">
+                <Plus className="w-3.5 h-3.5" /> Add Item
+              </button>
+            </div>
+
+            <div className="overflow-x-auto p-6 custom-scrollbar">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wider !text-zinc-400 font-semibold border-b border-white/5 pb-2">
+                    {["Product", "Batch No.", "Buy In", "Qty", "Cost", "Disc.", "Tax", "Warehouse", "Total", ""].map((h) => (
+                      <th key={h} className="pb-3 px-2 !text-zinc-400">{h}</th>
+                    ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {lines.map((line) => {
+                    const quantity = Number(line.quantity) || 0;
+                    const unitCost = Number(line.unitCost) || 0;
+                    const discount = Number(line.discount) || 0;
+                    const tax = Number(line.tax) || 0;
+                    const lineTotal = quantity * unitCost - discount + tax;
 
-      <section style={{ ...sectionStyle, marginTop: "20px" }}>
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid #edf0f5", background: "#fbfcfe" }}>
-          <p style={{ margin: 0, color: "#7b61a8", fontSize: "11px", fontWeight: 800 }}>AMOUNT</p>
-          <h2 style={{ margin: "5px 0 0", color: "#172033", fontSize: "19px" }}>Bill Totals</h2>
-        </div>
-        <div style={{ padding: "24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px", maxWidth: "700px" }}>
-            <label style={labelStyle}><span>Bill Discount</span><input type="number" min="0" step="0.01" value={billDiscount} onChange={(e) => setBillDiscount(e.target.value)} style={inputStyle} /></label>
-            <label style={labelStyle}><span>Bill Tax</span><input type="number" min="0" step="0.01" value={billTax} onChange={(e) => setBillTax(e.target.value)} style={inputStyle} /></label>
-          </div>
-          <div style={{ marginTop: "28px", marginLeft: "auto", maxWidth: "430px", border: "1px solid #e4e8ef", borderRadius: "12px", padding: "18px 20px", background: "#fbfcfe" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}><span>Subtotal</span><strong>PKR {formatAmount(subtotal)}</strong></div>
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}><span>Discount</span><strong style={{ color: "#b42318" }}>- PKR {formatAmount(totalDiscount)}</strong></div>
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}><span>Tax</span><strong>+ PKR {formatAmount(totalTax)}</strong></div>
-            <div style={{ borderTop: "1px solid #d8dee8", marginTop: "10px", paddingTop: "15px", display: "flex", justifyContent: "space-between", alignItems: "center" }}><strong style={{ fontSize: "16px" }}>Grand Total</strong><strong style={{ fontSize: "21px", color: "#7b61a8" }}>PKR {formatAmount(total)}</strong></div>
-          </div>
-        </div>
-      </section>
+                    return (
+                      <tr key={line.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-3 px-2">
+                          <select value={line.productId} onChange={(e) => updateLine(line.id, "productId", e.target.value)} className="w-[180px] !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white p-2 rounded-lg text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner">
+                            <option value="" className="bg-zinc-900">Select...</option>
+                            {products.map((p) => <option key={p.id} value={p.id} className="bg-zinc-900">{p.name}</option>)}
+                          </select>
+                        </td>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "20px" }}>
-        <button type="button" disabled={saving} onClick={() => router.push("/purchases/bills")} style={{ padding: "11px 18px", border: "1px solid #d8dee8", borderRadius: "8px", background: "#ffffff", color: "#344054", fontWeight: 600 }}>Cancel</button>
-        <button type="button" disabled={saving} onClick={() => saveBill("DRAFT")} style={{ padding: "11px 18px", border: "1px solid #7b61a8", borderRadius: "8px", background: "#ffffff", color: "#7b61a8", fontWeight: 700 }}>{saving ? "Saving..." : "Save Draft"}</button>
-        <button type="button" disabled={saving} onClick={() => saveBill("POSTED")} style={{ padding: "11px 20px", border: "1px solid #7b61a8", borderRadius: "8px", background: "#7b61a8", color: "#ffffff", fontWeight: 700 }}>{saving ? "Saving..." : "Save & Post"}</button>
-      </div>
+                        <td className="py-3 px-2">
+                          <input type="text" value={line.batchNumber} onChange={(e) => updateLine(line.id, "batchNumber", e.target.value)} placeholder="Auto" className="w-[90px] !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white p-2 rounded-lg text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" />
+                        </td>
+
+                        <td className="py-3 px-2">
+                          <select value={line.uom} onChange={(e) => updateLine(line.id, "uom", e.target.value)} className="w-[100px] !bg-teal-500/10 backdrop-blur-sm border border-teal-500/30 !text-teal-300 p-2 rounded-lg text-xs font-bold outline-none focus:border-teal-500 transition-colors shadow-inner">
+                            <option value="PIECES" className="bg-zinc-900 text-white">Pieces</option>
+                            <option value="KG" className="bg-zinc-900 text-white">KGs</option>
+                          </select>
+                        </td>
+
+                        <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.quantity} onChange={(e) => updateLine(line.id, "quantity", e.target.value)} className="w-[80px] !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white p-2 rounded-lg text-xs outline-none text-center focus:border-teal-500/50 transition-colors shadow-inner" /></td>
+                        <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.unitCost} onChange={(e) => updateLine(line.id, "unitCost", e.target.value)} className="w-[90px] !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white p-2 rounded-lg text-xs outline-none text-right focus:border-teal-500/50 transition-colors shadow-inner" /></td>
+                        <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.discount} onChange={(e) => updateLine(line.id, "discount", e.target.value)} className="w-[80px] !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white p-2 rounded-lg text-xs outline-none text-right focus:border-teal-500/50 transition-colors shadow-inner" /></td>
+                        <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.tax} onChange={(e) => updateLine(line.id, "tax", e.target.value)} className="w-[80px] !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white p-2 rounded-lg text-xs outline-none text-right focus:border-teal-500/50 transition-colors shadow-inner" /></td>
+                        
+                        <td className="py-3 px-2">
+                          <select value={line.warehouseId} onChange={(e) => updateLine(line.id, "warehouseId", e.target.value)} className="w-[130px] !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white p-2 rounded-lg text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner">
+                            <option value="" className="bg-zinc-900">Select...</option>
+                            {warehouses.map((w) => <option key={w.id} value={w.id} className="bg-zinc-900">{w.name}</option>)}
+                          </select>
+                        </td>
+
+                        <td className="py-3 px-2 text-right !text-teal-400 font-bold">{formatAmount(lineTotal)}</td>
+                        
+                        <td className="py-3 px-2 text-center">
+                          <button type="button" onClick={() => removeLine(line.id)} disabled={lines.length === 1} className="text-zinc-500 hover:text-rose-500 disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Bill Totals Section */}
+          <section className="bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/5 overflow-hidden">
+            <div className="p-6 border-b border-white/5 bg-zinc-950/30 flex items-center gap-2">
+              <Calculator className="w-4 h-4 text-teal-400" />
+              <h2 className="text-lg font-bold !text-white tracking-tight">Bill Totals</h2>
+            </div>
+            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <label className="flex flex-col gap-2 text-sm font-semibold !text-zinc-300">
+                  <span>Bill Discount</span>
+                  <input type="number" min="0" step="0.01" value={billDiscount} onChange={(e) => setBillDiscount(e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 outline-none transition-all shadow-inner" />
+                </label>
+                <label className="flex flex-col gap-2 text-sm font-semibold !text-zinc-300">
+                  <span>Bill Tax</span>
+                  <input type="number" min="0" step="0.01" value={billTax} onChange={(e) => setBillTax(e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm border border-white/10 !text-white px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 outline-none transition-all shadow-inner" />
+                </label>
+              </div>
+
+              <div className="bg-zinc-950/60 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-inner space-y-3">
+                <div className="flex justify-between text-sm !text-zinc-400 border-b border-white/5 pb-3"><span>Subtotal</span><strong className="!text-white">PKR {formatAmount(subtotal)}</strong></div>
+                <div className="flex justify-between text-sm !text-zinc-400 border-b border-white/5 pb-3"><span>Discount</span><strong className="!text-rose-400">- PKR {formatAmount(totalDiscount)}</strong></div>
+                <div className="flex justify-between text-sm !text-zinc-400 border-b border-white/5 pb-3"><span>Tax</span><strong className="!text-teal-400">+ PKR {formatAmount(totalTax)}</strong></div>
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-base font-bold !text-white">Grand Total</span>
+                  <span className="text-2xl font-black !text-teal-400 drop-shadow-sm">PKR {formatAmount(total)}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" disabled={saving} onClick={() => router.push("/purchases/bills")} className="px-6 py-2.5 text-sm font-semibold !text-zinc-400 hover:!text-white bg-transparent hover:bg-white/5 rounded-xl transition-colors border border-transparent hover:border-white/10 backdrop-blur-sm">Cancel</button>
+            <button type="button" disabled={saving} onClick={() => saveBill("DRAFT")} className="px-6 py-2.5 text-sm font-semibold !text-teal-300 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl backdrop-blur-md transition-all shadow-sm">{saving ? "Saving..." : "Save Draft"}</button>
+            <button type="button" disabled={saving} onClick={() => saveBill("POSTED")} className="px-6 py-2.5 text-sm font-semibold !text-white !bg-teal-600/80 hover:!bg-teal-500 backdrop-blur-md border border-teal-500/50 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-[0_4px_12px_rgba(20,184,166,0.3)] transition-all">{saving ? "Saving..." : "Save & Post"}</button>
+          </div>
+
+        </div>
+      </ERPShell>
+      
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); }
+      `}} />
     </div>
   );
 }
