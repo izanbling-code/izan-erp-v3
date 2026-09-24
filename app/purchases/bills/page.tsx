@@ -226,7 +226,7 @@ export default function PurchaseBillsPage() {
       <ERPShell title="Purchase Bills">
         <div className="max-w-7xl mx-auto p-8 space-y-6">
           
-          {/* Header - IPRoyal Gradient Theme */}
+          {/* Header */}
           <div className="flex justify-between items-center bg-gradient-to-r from-[#004e54] to-[#009b9b] p-6 rounded-xl shadow-sm border border-teal-800/50">
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight">Purchase Bills</h1>
@@ -279,13 +279,16 @@ export default function PurchaseBillsPage() {
                       return (
                       <tr key={bill.id} className="hover:bg-zinc-800/40 transition-colors group">
                         
-                        <td className="py-4 px-6 font-medium text-white flex items-center gap-3">
-                          {bill.billNo}
-                          {isRepackaged && (
-                            <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
-                              Repackaged
-                            </span>
-                          )}
+                        {/* FIX APPLIED HERE: Moved flex container into a div */}
+                        <td className="py-4 px-6 font-medium text-white">
+                          <div className="flex items-center gap-3">
+                            {bill.billNo}
+                            {isRepackaged && (
+                              <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
+                                Repackaged
+                              </span>
+                            )}
+                          </div>
                         </td>
                         
                         <td className="py-4 px-6 text-zinc-400">{new Date(bill.billDate).toISOString().slice(0, 10)}</td>
@@ -407,12 +410,11 @@ export default function PurchaseBillsPage() {
         </div>
       )}
 
-      {/* ZERO-BALANCE ALLOCATION MODAL (REPACKAGING ENGINE) */}
+      {/* ZERO-BALANCE ALLOCATION MODAL */}
       {allocatingBill && (
         <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-[95vw] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-fade-in">
             
-            {/* Modal Header */}
             <div className="px-6 py-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
               <div>
                 <h2 className="text-xl font-bold text-white tracking-tight">Stock Allocation & Re-Packaging</h2>
@@ -421,7 +423,6 @@ export default function PurchaseBillsPage() {
               <button onClick={() => setAllocatingBill(null)} disabled={isSubmitting} className="text-zinc-500 hover:text-white text-3xl transition">&times;</button>
             </div>
 
-            {/* Grid Area */}
             <div className="flex-1 overflow-auto p-4 md:p-6 bg-zinc-950 custom-scrollbar">
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead>
@@ -516,10 +517,8 @@ export default function PurchaseBillsPage() {
               <button onClick={addAllocLine} className="mt-4 text-xs font-bold text-teal-400 hover:text-teal-300 uppercase tracking-widest flex items-center gap-1 transition-colors"><Plus className="w-3 h-3"/> Add Row</button>
             </div>
 
-            {/* Bottom Balancer Area */}
             <div className="border-t border-zinc-800 flex flex-col lg:flex-row gap-0 bg-zinc-900">
               
-              {/* Adjustments */}
               <div className="p-6 lg:w-1/3 border-r border-zinc-800 space-y-4">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-4">Adjustments & Extra Costs</h3>
                 
@@ -550,7 +549,6 @@ export default function PurchaseBillsPage() {
                 </button>
               </div>
 
-              {/* Zero-Balance Summaries */}
               <div className="bg-zinc-950 p-6 lg:w-2/3 flex flex-col justify-between">
                 
                 <div className="flex flex-col gap-4 mb-6">
