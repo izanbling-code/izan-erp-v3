@@ -266,20 +266,20 @@ export default function PurchaseBillsPage() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="!bg-zinc-950/40 !text-zinc-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
-                      <th className="py-4 px-6 !text-zinc-400">Bill #</th>
-                      <th className="py-4 px-6 !text-zinc-400">Date</th>
-                      <th className="py-4 px-6 !text-zinc-400">Supplier</th>
-                      <th className="py-4 px-6 !text-zinc-400">Total</th>
-                      <th className="py-4 px-6 text-center !text-zinc-400">Status</th>
-                      <th className="py-4 px-6 text-right !text-zinc-400">Actions</th>
+                      <th className="py-4 px-6 !text-zinc-400 !bg-transparent">Bill #</th>
+                      <th className="py-4 px-6 !text-zinc-400 !bg-transparent">Date</th>
+                      <th className="py-4 px-6 !text-zinc-400 !bg-transparent">Supplier</th>
+                      <th className="py-4 px-6 !text-zinc-400 !bg-transparent">Total</th>
+                      <th className="py-4 px-6 text-center !text-zinc-400 !bg-transparent">Status</th>
+                      <th className="py-4 px-6 text-right !text-zinc-400 !bg-transparent">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-sm">
                     {bills.map((bill) => {
                       const isRepackaged = bill.notes?.includes("[REPACKAGED]");
                       return (
-                      <tr key={bill.id} className="hover:!bg-white/[0.05] transition-colors group">
-                        <td className="py-4 px-6 font-medium !text-white">
+                      <tr key={bill.id} className="hover:!bg-zinc-800 transition-colors group">
+                        <td className="py-4 px-6 font-medium !text-white !bg-transparent">
                           <div className="flex items-center gap-3">
                             {bill.billNo}
                             {isRepackaged && (
@@ -290,11 +290,11 @@ export default function PurchaseBillsPage() {
                           </div>
                         </td>
                         
-                        <td className="py-4 px-6 !text-zinc-300">{new Date(bill.billDate).toISOString().slice(0, 10)}</td>
-                        <td className="py-4 px-6 !text-zinc-300">{bill.supplier?.name}</td>
-                        <td className="py-4 px-6 font-medium !text-white">{money(bill.total)}</td>
+                        <td className="py-4 px-6 !text-zinc-300 !bg-transparent">{new Date(bill.billDate).toISOString().slice(0, 10)}</td>
+                        <td className="py-4 px-6 !text-zinc-300 !bg-transparent">{bill.supplier?.name}</td>
+                        <td className="py-4 px-6 font-medium !text-white !bg-transparent">{money(bill.total)}</td>
                         
-                        <td className="py-4 px-6 text-center">
+                        <td className="py-4 px-6 text-center !bg-transparent">
                           <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide backdrop-blur-md shadow-sm ${
                             bill.status === "POSTED" 
                               ? "!bg-teal-500/20 !text-teal-300 border border-teal-500/30" 
@@ -304,7 +304,7 @@ export default function PurchaseBillsPage() {
                           </span>
                         </td>
                         
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 !bg-transparent">
                           <div className="flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => setViewingBill(bill)} className="!text-zinc-400 hover:!text-white p-2 transition-colors" title="Quick View">
                               <Eye className="w-4 h-4" />
@@ -350,7 +350,7 @@ export default function PurchaseBillsPage() {
       {/* VIEW BILL MODAL */}
       {viewingBill && (
         <div className="fixed inset-0 bg-zinc-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="!bg-zinc-900/70 backdrop-blur-2xl border border-white/10 w-full max-w-3xl rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in p-6 relative">
+          <div className="!bg-zinc-900/90 backdrop-blur-3xl border border-white/10 w-full max-w-3xl rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in p-6 relative">
             <div className="absolute top-[-50px] right-[-50px] w-48 h-48 bg-teal-500/10 rounded-full blur-[60px] pointer-events-none"></div>
             
             <div className="flex justify-between items-start mb-6 relative z-10">
@@ -372,7 +372,7 @@ export default function PurchaseBillsPage() {
       {/* VIEW ALLOCATION DETAILS MODAL */}
       {viewingAllocation && (
         <div className="fixed inset-0 bg-zinc-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="!bg-zinc-900/70 backdrop-blur-2xl border border-white/10 w-full max-w-4xl rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in p-6 relative">
+          <div className="!bg-zinc-900/90 backdrop-blur-3xl border border-white/10 w-full max-w-4xl rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in p-6 relative">
             <div className="absolute top-[-50px] left-[-50px] w-48 h-48 bg-indigo-500/10 rounded-full blur-[60px] pointer-events-none"></div>
 
             <div className="flex justify-between items-start mb-6 relative z-10">
@@ -386,24 +386,24 @@ export default function PurchaseBillsPage() {
               <table className="w-full text-left text-sm">
                 <thead className="!bg-zinc-900/30 !text-zinc-400 text-[10px] uppercase border-b border-white/5 font-semibold tracking-wider">
                   <tr>
-                    <th className="p-4 !text-zinc-400">Product Breakdown</th>
-                    <th className="p-4 text-center !text-zinc-400">Yield Qty</th>
-                    <th className="p-4 text-right !text-zinc-400">Unit Cost</th>
-                    <th className="p-4 text-right !text-zinc-400">Total Value</th>
+                    <th className="p-4 !text-zinc-400 !bg-transparent">Product Breakdown</th>
+                    <th className="p-4 text-center !text-zinc-400 !bg-transparent">Yield Qty</th>
+                    <th className="p-4 text-right !text-zinc-400 !bg-transparent">Unit Cost</th>
+                    <th className="p-4 text-right !text-zinc-400 !bg-transparent">Total Value</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {viewingAllocation.map((mov, i) => (
-                    <tr key={i} className="hover:!bg-white/[0.02] !text-zinc-300 transition-colors">
-                      <td className="p-4 font-medium">
+                    <tr key={i} className="hover:!bg-zinc-800 !text-zinc-300 transition-colors">
+                      <td className="p-4 font-medium !bg-transparent">
                         {mov.product?.name} 
                         <span className="block text-[10px] !text-zinc-500 mt-0.5">
                           {mov.product?.category?.name || "No Category"} • {mov.product?.brand?.name || "No Brand"}
                         </span>
                       </td>
-                      <td className="p-4 text-center font-bold !text-white">{mov.quantity}</td>
-                      <td className="p-4 text-right !text-zinc-300">{money(mov.unitCost)}</td>
-                      <td className="p-4 text-right !text-teal-400 font-bold drop-shadow-sm">{money(mov.totalCost)}</td>
+                      <td className="p-4 text-center font-bold !text-white !bg-transparent">{mov.quantity}</td>
+                      <td className="p-4 text-right !text-zinc-300 !bg-transparent">{money(mov.unitCost)}</td>
+                      <td className="p-4 text-right !text-teal-400 font-bold drop-shadow-sm !bg-transparent">{money(mov.totalCost)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -416,7 +416,7 @@ export default function PurchaseBillsPage() {
       {/* ZERO-BALANCE ALLOCATION MODAL */}
       {allocatingBill && (
         <div className="fixed inset-0 bg-zinc-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="!bg-zinc-900/70 backdrop-blur-2xl border border-white/10 w-full max-w-[95vw] rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[95vh] animate-fade-in relative">
+          <div className="!bg-zinc-900/90 backdrop-blur-3xl border border-white/10 w-full max-w-[95vw] rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[95vh] animate-fade-in relative">
             
             <div className="px-6 py-5 border-b border-white/5 flex justify-between items-center !bg-zinc-900/30 relative z-10">
               <div>
@@ -430,22 +430,22 @@ export default function PurchaseBillsPage() {
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead>
                   <tr className="text-[10px] uppercase tracking-wider !text-zinc-400 font-semibold border-b border-white/5 pb-2">
-                    <th className="pb-3 px-2 w-48">Item Name</th>
-                    <th className="pb-3 px-2 w-24">Batch</th>
-                    <th className="pb-3 px-2 w-32">Category</th>
-                    <th className="pb-3 px-2 w-32">Brand</th>
-                    <th className="pb-3 px-2 w-24">Unit</th>
-                    <th className="pb-3 px-2 w-20 text-center">Yield Qty</th>
-                    <th className="pb-3 px-2 w-24 text-center">Weight (g)</th>
-                    <th className="pb-3 px-2 w-24 text-right">Unit Cost</th>
-                    <th className="pb-3 px-2 w-28 text-right">Total Cost</th>
-                    <th className="pb-3 px-2 w-10 text-center"></th>
+                    <th className="pb-3 px-2 w-48 !bg-transparent">Item Name</th>
+                    <th className="pb-3 px-2 w-24 !bg-transparent">Batch</th>
+                    <th className="pb-3 px-2 w-32 !bg-transparent">Category</th>
+                    <th className="pb-3 px-2 w-32 !bg-transparent">Brand</th>
+                    <th className="pb-3 px-2 w-24 !bg-transparent">Unit</th>
+                    <th className="pb-3 px-2 w-20 text-center !bg-transparent">Yield Qty</th>
+                    <th className="pb-3 px-2 w-24 text-center !bg-transparent">Weight (g)</th>
+                    <th className="pb-3 px-2 w-24 text-right !bg-transparent">Unit Cost</th>
+                    <th className="pb-3 px-2 w-28 text-right !bg-transparent">Total Cost</th>
+                    <th className="pb-3 px-2 w-10 text-center !bg-transparent"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {allocLines.map((line) => (
-                    <tr key={line.id} className="hover:!bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-2">
+                    <tr key={line.id} className="hover:!bg-zinc-800 transition-colors">
+                      <td className="py-3 px-2 !bg-transparent">
                         {line.isNewItem ? (
                           <div className="flex gap-1 relative">
                             <input type="text" placeholder="New Item..." value={line.name} onChange={e => updateAllocLine(line.id, "name", e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm !text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" autoFocus />
@@ -460,9 +460,9 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
                       
-                      <td className="py-3 px-2"><input type="text" placeholder="Auto" value={line.batchNo} onChange={e => updateAllocLine(line.id, "batchNo", e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm !text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" /></td>
+                      <td className="py-3 px-2 !bg-transparent"><input type="text" placeholder="Auto" value={line.batchNo} onChange={e => updateAllocLine(line.id, "batchNo", e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm !text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" /></td>
                       
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-2 !bg-transparent">
                         {line.isNewCat ? (
                           <div className="flex gap-1 relative">
                             <input type="text" placeholder="New Cat..." value={line.newCatName} onChange={e => updateAllocLine(line.id, "newCatName", e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm !text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" autoFocus />
@@ -477,7 +477,7 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
 
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-2 !bg-transparent">
                         {line.isNewBrand ? (
                           <div className="flex gap-1 relative">
                             <input type="text" placeholder="New Brand..." value={line.newBrandName} onChange={e => updateAllocLine(line.id, "newBrandName", e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm !text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" autoFocus />
@@ -492,7 +492,7 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
 
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-2 !bg-transparent">
                         {line.isNewUnit ? (
                           <div className="flex gap-1 relative">
                             <input type="text" placeholder="New Unit..." value={line.newUnitName} onChange={e => updateAllocLine(line.id, "newUnitName", e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm !text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" autoFocus />
@@ -507,12 +507,12 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
 
-                      <td className="py-3 px-2"><input type="number" min="0" value={line.yieldQty} onChange={e => updateAllocLine(line.id, "yieldQty", e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm !text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none text-center focus:border-teal-500/50 transition-colors shadow-inner" /></td>
-                      <td className="py-3 px-2"><input type="number" min="0" value={line.weightGrams} onChange={e => updateAllocLine(line.id, "weightGrams", e.target.value)} className="w-full !bg-amber-500/20 backdrop-blur-sm !text-amber-300 border border-amber-500/30 rounded-lg p-1.5 text-xs outline-none text-center focus:border-amber-500/50 font-bold transition-colors shadow-inner" /></td>
-                      <td className="py-3 px-2"><input type="number" min="0" value={line.unitCost} readOnly className="w-full !bg-white/5 backdrop-blur-sm !text-zinc-400 border border-white/5 rounded-lg p-1.5 text-xs outline-none text-right font-bold cursor-not-allowed" /></td>
-                      <td className="py-3 px-2"><input type="number" min="0" value={line.totalCost} onChange={e => updateAllocLine(line.id, "totalCost", e.target.value)} className="w-full !bg-teal-500/20 backdrop-blur-sm !text-teal-300 border border-teal-500/30 rounded-lg p-1.5 text-xs outline-none text-right font-bold focus:border-teal-500/50 transition-colors shadow-inner" /></td>
+                      <td className="py-3 px-2 !bg-transparent"><input type="number" min="0" value={line.yieldQty} onChange={e => updateAllocLine(line.id, "yieldQty", e.target.value)} className="w-full !bg-zinc-950/50 backdrop-blur-sm !text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none text-center focus:border-teal-500/50 transition-colors shadow-inner" /></td>
+                      <td className="py-3 px-2 !bg-transparent"><input type="number" min="0" value={line.weightGrams} onChange={e => updateAllocLine(line.id, "weightGrams", e.target.value)} className="w-full !bg-amber-500/20 backdrop-blur-sm !text-amber-300 border border-amber-500/30 rounded-lg p-1.5 text-xs outline-none text-center focus:border-amber-500/50 font-bold transition-colors shadow-inner" /></td>
+                      <td className="py-3 px-2 !bg-transparent"><input type="number" min="0" value={line.unitCost} readOnly className="w-full !bg-white/5 backdrop-blur-sm !text-zinc-400 border border-white/5 rounded-lg p-1.5 text-xs outline-none text-right font-bold cursor-not-allowed" /></td>
+                      <td className="py-3 px-2 !bg-transparent"><input type="number" min="0" value={line.totalCost} onChange={e => updateAllocLine(line.id, "totalCost", e.target.value)} className="w-full !bg-teal-500/20 backdrop-blur-sm !text-teal-300 border border-teal-500/30 rounded-lg p-1.5 text-xs outline-none text-right font-bold focus:border-teal-500/50 transition-colors shadow-inner" /></td>
                       
-                      <td className="py-3 px-2 text-center"><button onClick={() => setAllocLines(prev => prev.filter(l => l.id !== line.id))} className="!text-zinc-500 hover:!text-rose-500 font-bold transition-colors"><Trash2 className="w-4 h-4 mx-auto"/></button></td>
+                      <td className="py-3 px-2 text-center !bg-transparent"><button onClick={() => setAllocLines(prev => prev.filter(l => l.id !== line.id))} className="!text-zinc-500 hover:!text-rose-500 font-bold transition-colors"><Trash2 className="w-4 h-4 mx-auto"/></button></td>
                     </tr>
                   ))}
                 </tbody>
