@@ -221,38 +221,43 @@ export default function PurchaseBillsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-300 font-sans antialiased relative">
+    <div className="min-h-screen bg-zinc-950 text-zinc-300 font-sans antialiased relative overflow-hidden">
+      
+      {/* Ambient Glassmorphism Lights */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-teal-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+
       <Toaster position="top-right" />
       <ERPShell title="Purchase Bills">
-        <div className="max-w-7xl mx-auto p-8 space-y-6">
+        <div className="max-w-7xl mx-auto p-8 space-y-6 relative z-10">
           
-          {/* Header */}
-          <div className="flex justify-between items-center bg-gradient-to-r from-[#004e54] to-[#009b9b] p-6 rounded-xl shadow-sm border border-teal-800/50">
+          {/* Header - Glass Gradient Theme */}
+          <div className="flex justify-between items-center bg-gradient-to-r from-[#004e54]/80 to-[#009b9b]/80 backdrop-blur-xl p-6 rounded-2xl shadow-2xl border border-white/10">
             <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">Purchase Bills</h1>
-              <p className="text-teal-50 mt-1 text-sm opacity-90">Manage vendor procurement, batch receiving, and stock allocation.</p>
+              <h1 className="text-2xl font-bold text-white tracking-tight drop-shadow-sm">Purchase Bills</h1>
+              <p className="text-teal-50 mt-1 text-sm opacity-90 drop-shadow-sm">Manage vendor procurement, batch receiving, and stock allocation.</p>
             </div>
-            <Link href="/purchases/bills/new" className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2">
+            <Link href="/purchases/bills/new" className="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-[0_4px_12px_rgba(0,0,0,0.1)] flex items-center gap-2">
               <Plus className="w-4 h-4" /> Create Bill
             </Link>
           </div>
 
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 shadow-sm overflow-hidden">
+          <div className="bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/5 overflow-hidden">
             
             {/* Toolbar */}
-            <div className="p-4 border-b border-zinc-800 flex gap-3 bg-zinc-900/50">
+            <div className="p-4 border-b border-white/5 flex gap-3 bg-zinc-950/30">
               <div className="relative w-96">
-                <Search className="absolute left-3 top-2.5 text-zinc-500 w-4 h-4" />
+                <Search className="absolute left-3 top-2.5 text-zinc-400 w-4 h-4" />
                 <input 
                   type="text" 
                   placeholder="Search by Bill # or Supplier..." 
                   value={search} 
                   onChange={(e) => setSearch(e.target.value)} 
                   onKeyDown={(e) => e.key === "Enter" && loadBills()} 
-                  className="w-full bg-zinc-950 border border-zinc-700 text-white pl-9 pr-4 py-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all placeholder-zinc-500" 
+                  className="w-full bg-zinc-950/50 backdrop-blur-sm border border-white/5 text-white pl-9 pr-4 py-2 rounded-xl text-sm focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 outline-none transition-all placeholder-zinc-500 shadow-inner" 
                 />
               </div>
-              <button onClick={loadBills} className="bg-zinc-800 hover:bg-zinc-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors border border-zinc-700">
+              <button onClick={loadBills} className="bg-white/5 hover:bg-white/10 backdrop-blur-sm text-white px-5 py-2 rounded-xl text-sm font-medium transition-all border border-white/5 shadow-sm">
                 Search
               </button>
             </div>
@@ -264,7 +269,7 @@ export default function PurchaseBillsPage() {
               ) : (
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-zinc-950/50 text-zinc-400 text-xs uppercase tracking-wider font-semibold border-b border-zinc-800">
+                    <tr className="bg-zinc-950/40 text-zinc-400 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
                       <th className="py-4 px-6">Bill #</th>
                       <th className="py-4 px-6">Date</th>
                       <th className="py-4 px-6">Supplier</th>
@@ -273,18 +278,16 @@ export default function PurchaseBillsPage() {
                       <th className="py-4 px-6 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800 text-sm">
+                  <tbody className="divide-y divide-white/5 text-sm">
                     {bills.map((bill) => {
                       const isRepackaged = bill.notes?.includes("[REPACKAGED]");
                       return (
-                      <tr key={bill.id} className="hover:bg-zinc-800/40 transition-colors group">
-                        
-                        {/* FIX APPLIED HERE: Moved flex container into a div */}
+                      <tr key={bill.id} className="hover:bg-white/[0.02] transition-colors group">
                         <td className="py-4 px-6 font-medium text-white">
                           <div className="flex items-center gap-3">
                             {bill.billNo}
                             {isRepackaged && (
-                              <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
+                              <span className="bg-purple-500/20 backdrop-blur-md text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wide shadow-sm">
                                 Repackaged
                               </span>
                             )}
@@ -296,10 +299,10 @@ export default function PurchaseBillsPage() {
                         <td className="py-4 px-6 font-medium text-white">{money(bill.total)}</td>
                         
                         <td className="py-4 px-6 text-center">
-                          <span className={`px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide ${
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide backdrop-blur-md shadow-sm ${
                             bill.status === "POSTED" 
-                              ? "bg-teal-500/10 text-teal-400 border border-teal-500/20" 
-                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              ? "bg-teal-500/20 text-teal-300 border border-teal-500/30" 
+                              : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
                           }`}>
                             {bill.status}
                           </span>
@@ -315,13 +318,13 @@ export default function PurchaseBillsPage() {
                               <>
                                 <button onClick={() => toast.error("Use Edit page for this.")} className="text-zinc-400 hover:text-amber-400 transition" title="Edit Bill"><Edit className="w-4 h-4" /></button>
                                 <button onClick={() => handleAction(bill.id, "DELETE")} className="text-zinc-400 hover:text-rose-500 transition" title="Delete Draft"><Trash2 className="w-4 h-4" /></button>
-                                <button onClick={() => handleAction(bill.id, "POST")} className="text-xs bg-teal-600/20 text-teal-400 border border-teal-500/20 hover:bg-teal-600 hover:text-white px-2 py-1 rounded font-bold uppercase transition ml-1">Post</button>
+                                <button onClick={() => handleAction(bill.id, "POST")} className="text-xs bg-teal-500/20 backdrop-blur-md text-teal-300 border border-teal-500/30 hover:bg-teal-500 hover:text-white px-3 py-1.5 rounded-lg font-bold uppercase transition ml-1">Post</button>
                               </>
                             )}
                             
                             {bill.status === "POSTED" && !isRepackaged && (
                               <>
-                                <button onClick={() => openAllocation(bill)} className="bg-teal-600 hover:bg-teal-500 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors shadow-sm flex items-center gap-2">
+                                <button onClick={() => openAllocation(bill)} className="bg-teal-600/80 hover:bg-teal-500 backdrop-blur-md text-white border border-teal-500/50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-lg flex items-center gap-2">
                                   <Layers className="w-3.5 h-3.5" /> Allocate
                                 </button>
                                 <button onClick={() => handleAction(bill.id, "REVERSE")} className="text-zinc-400 hover:text-rose-500 p-2 transition-colors ml-1" title="Reverse Bill"><RotateCcw className="w-4 h-4" /></button>
@@ -330,7 +333,7 @@ export default function PurchaseBillsPage() {
                             
                             {bill.status === "POSTED" && isRepackaged && (
                               <>
-                                <button onClick={() => openAllocationDetails(bill.id)} className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors border border-zinc-700 flex items-center gap-2">
+                                <button onClick={() => openAllocationDetails(bill.id)} className="bg-white/5 hover:bg-white/10 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border border-white/10 flex items-center gap-2">
                                   <LayoutGrid className="w-3.5 h-3.5"/> View
                                 </button>
                                 <button onClick={() => undoAllocation(bill.id)} className="text-zinc-400 hover:text-amber-500 p-2 transition-colors ml-1" title="Undo Allocation"><Undo2 className="w-4 h-4" /></button>
@@ -348,40 +351,44 @@ export default function PurchaseBillsPage() {
         </div>
       </ERPShell>
 
-      {/* VIEW BILL MODAL */}
+      {/* VIEW BILL MODAL (GLASS) */}
       {viewingBill && (
-        <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden animate-fade-in p-6">
-            <div className="flex justify-between items-start mb-6">
+        <div className="fixed inset-0 bg-zinc-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900/70 backdrop-blur-2xl border border-white/10 w-full max-w-3xl rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in p-6 relative">
+            <div className="absolute top-[-50px] right-[-50px] w-48 h-48 bg-teal-500/10 rounded-full blur-[60px] pointer-events-none"></div>
+            
+            <div className="flex justify-between items-start mb-6 relative z-10">
               <div>
                 <h2 className="text-xl font-bold text-white tracking-tight">Purchase Bill {viewingBill.billNo}</h2>
                 <p className="text-zinc-400 text-sm mt-1">{viewingBill.supplier?.name} • {new Date(viewingBill.billDate).toLocaleDateString()}</p>
               </div>
-              <button onClick={() => setViewingBill(null)} className="text-zinc-500 hover:text-white text-2xl">&times;</button>
+              <button onClick={() => setViewingBill(null)} className="text-zinc-500 hover:text-white text-2xl transition-colors">&times;</button>
             </div>
-            <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5 space-y-3">
-              <div className="flex justify-between text-sm text-zinc-400 border-b border-zinc-800 pb-3"><span>Status</span><strong className="text-white">{viewingBill.status}</strong></div>
-              <div className="flex justify-between text-sm text-zinc-400 border-b border-zinc-800 pb-3"><span>Total Amount</span><strong className="text-teal-400">{money(viewingBill.total)}</strong></div>
+            <div className="bg-zinc-950/40 backdrop-blur-sm rounded-xl border border-white/5 p-5 space-y-3 relative z-10">
+              <div className="flex justify-between text-sm text-zinc-400 border-b border-white/5 pb-3"><span>Status</span><strong className="text-white">{viewingBill.status}</strong></div>
+              <div className="flex justify-between text-sm text-zinc-400 border-b border-white/5 pb-3"><span>Total Amount</span><strong className="text-teal-400 drop-shadow-sm">{money(viewingBill.total)}</strong></div>
               <div className="flex justify-between text-sm text-zinc-400"><span>Notes</span><span className="text-white text-right max-w-sm">{viewingBill.notes || "None"}</span></div>
             </div>
           </div>
         </div>
       )}
 
-      {/* VIEW ALLOCATION DETAILS MODAL */}
+      {/* VIEW ALLOCATION DETAILS MODAL (GLASS) */}
       {viewingAllocation && (
-        <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-fade-in p-6">
-            <div className="flex justify-between items-start mb-6">
+        <div className="fixed inset-0 bg-zinc-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900/70 backdrop-blur-2xl border border-white/10 w-full max-w-4xl rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in p-6 relative">
+            <div className="absolute top-[-50px] left-[-50px] w-48 h-48 bg-indigo-500/10 rounded-full blur-[60px] pointer-events-none"></div>
+
+            <div className="flex justify-between items-start mb-6 relative z-10">
               <div>
                 <h2 className="text-xl font-bold text-white tracking-tight">Allocation Details</h2>
-                <p className="text-teal-400 text-xs mt-1 font-bold uppercase tracking-widest">Items generated from bulk purchase</p>
+                <p className="text-teal-400 text-xs mt-1 font-bold uppercase tracking-widest drop-shadow-sm">Items generated from bulk purchase</p>
               </div>
-              <button onClick={() => setViewingAllocation(null)} className="text-zinc-500 hover:text-white text-2xl">&times;</button>
+              <button onClick={() => setViewingAllocation(null)} className="text-zinc-500 hover:text-white text-2xl transition-colors">&times;</button>
             </div>
-            <div className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
+            <div className="bg-zinc-950/40 backdrop-blur-sm rounded-xl border border-white/5 overflow-hidden relative z-10">
               <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-900/50 text-zinc-400 text-[10px] uppercase border-b border-zinc-800 font-semibold tracking-wider">
+                <thead className="bg-zinc-900/30 text-zinc-400 text-[10px] uppercase border-b border-white/5 font-semibold tracking-wider">
                   <tr>
                     <th className="p-4">Product Breakdown</th>
                     <th className="p-4 text-center">Yield Qty</th>
@@ -389,9 +396,9 @@ export default function PurchaseBillsPage() {
                     <th className="p-4 text-right">Total Value</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/50">
+                <tbody className="divide-y divide-white/5">
                   {viewingAllocation.map((mov, i) => (
-                    <tr key={i} className="hover:bg-zinc-800/30 text-zinc-300 transition-colors">
+                    <tr key={i} className="hover:bg-white/[0.02] text-zinc-300 transition-colors">
                       <td className="p-4 font-medium">
                         {mov.product?.name} 
                         <span className="block text-[10px] text-zinc-500 mt-0.5">
@@ -400,7 +407,7 @@ export default function PurchaseBillsPage() {
                       </td>
                       <td className="p-4 text-center font-bold text-white">{mov.quantity}</td>
                       <td className="p-4 text-right">{money(mov.unitCost)}</td>
-                      <td className="p-4 text-right text-teal-400 font-bold">{money(mov.totalCost)}</td>
+                      <td className="p-4 text-right text-teal-400 font-bold drop-shadow-sm">{money(mov.totalCost)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -410,23 +417,25 @@ export default function PurchaseBillsPage() {
         </div>
       )}
 
-      {/* ZERO-BALANCE ALLOCATION MODAL */}
+      {/* ZERO-BALANCE ALLOCATION MODAL (GLASS) */}
       {allocatingBill && (
-        <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-[95vw] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-fade-in">
+        <div className="fixed inset-0 bg-zinc-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900/70 backdrop-blur-2xl border border-white/10 w-full max-w-[95vw] rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[95vh] animate-fade-in relative">
             
-            <div className="px-6 py-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-white/5 flex justify-between items-center bg-zinc-900/30 relative z-10">
               <div>
                 <h2 className="text-xl font-bold text-white tracking-tight">Stock Allocation & Re-Packaging</h2>
-                <p className="text-xs text-teal-400 font-bold uppercase tracking-widest mt-1">Bill {allocatingBill.billNo} • Target: {targetWeight}g / {money(targetTotal)}</p>
+                <p className="text-xs text-teal-400 font-bold uppercase tracking-widest mt-1 drop-shadow-sm">Bill {allocatingBill.billNo} • Target: {targetWeight}g / {money(targetTotal)}</p>
               </div>
-              <button onClick={() => setAllocatingBill(null)} disabled={isSubmitting} className="text-zinc-500 hover:text-white text-3xl transition">&times;</button>
+              <button onClick={() => setAllocatingBill(null)} disabled={isSubmitting} className="text-zinc-500 hover:text-white text-3xl transition-colors">&times;</button>
             </div>
 
-            <div className="flex-1 overflow-auto p-4 md:p-6 bg-zinc-950 custom-scrollbar">
+            {/* Grid Area */}
+            <div className="flex-1 overflow-auto p-4 md:p-6 bg-zinc-950/40 custom-scrollbar relative z-10">
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead>
-                  <tr className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold border-b border-zinc-800 pb-2">
+                  <tr className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold border-b border-white/5 pb-2">
                     <th className="pb-3 px-2 w-48">Item Name</th>
                     <th className="pb-3 px-2 w-24">Batch</th>
                     <th className="pb-3 px-2 w-32">Category</th>
@@ -439,17 +448,17 @@ export default function PurchaseBillsPage() {
                     <th className="pb-3 px-2 w-10 text-center"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/50">
+                <tbody className="divide-y divide-white/5">
                   {allocLines.map((line) => (
-                    <tr key={line.id} className="hover:bg-zinc-800/20 transition-colors">
+                    <tr key={line.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="py-3 px-2">
                         {line.isNewItem ? (
                           <div className="flex gap-1 relative">
-                            <input type="text" placeholder="New Item..." value={line.name} onChange={e => updateAllocLine(line.id, "name", e.target.value)} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none focus:border-teal-500 transition-colors" autoFocus />
+                            <input type="text" placeholder="New Item..." value={line.name} onChange={e => updateAllocLine(line.id, "name", e.target.value)} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" autoFocus />
                             <button onClick={() => updateAllocLine(line.id, "productId", "")} className="absolute right-1 top-1.5 text-xs text-rose-500 hover:text-rose-400 font-bold px-1">&times;</button>
                           </div>
                         ) : (
-                          <select value={line.productId} onChange={e => updateAllocLine(line.id, "productId", e.target.value)} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none focus:border-teal-500 transition-colors">
+                          <select value={line.productId} onChange={e => updateAllocLine(line.id, "productId", e.target.value)} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner">
                             <option value="">Select Item...</option>
                             <option value="NEW" className="font-bold text-teal-400">+ New Item</option>
                             {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -457,16 +466,16 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
                       
-                      <td className="py-3 px-2"><input type="text" placeholder="Auto" value={line.batchNo} onChange={e => updateAllocLine(line.id, "batchNo", e.target.value)} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none focus:border-teal-500 transition-colors" /></td>
+                      <td className="py-3 px-2"><input type="text" placeholder="Auto" value={line.batchNo} onChange={e => updateAllocLine(line.id, "batchNo", e.target.value)} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" /></td>
                       
                       <td className="py-3 px-2">
                         {line.isNewCat ? (
                           <div className="flex gap-1 relative">
-                            <input type="text" placeholder="New Cat..." value={line.newCatName} onChange={e => updateAllocLine(line.id, "newCatName", e.target.value)} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none focus:border-teal-500 transition-colors" autoFocus />
+                            <input type="text" placeholder="New Cat..." value={line.newCatName} onChange={e => updateAllocLine(line.id, "newCatName", e.target.value)} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" autoFocus />
                             <button onClick={() => updateAllocLine(line.id, "categoryId", "")} className="absolute right-1 top-1.5 text-xs text-rose-500 hover:text-rose-400 font-bold px-1">&times;</button>
                           </div>
                         ) : (
-                          <select value={line.categoryId} onChange={e => updateAllocLine(line.id, "categoryId", e.target.value)} disabled={!line.isNewItem} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none focus:border-teal-500 disabled:opacity-50 transition-colors">
+                          <select value={line.categoryId} onChange={e => updateAllocLine(line.id, "categoryId", e.target.value)} disabled={!line.isNewItem} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 disabled:opacity-50 transition-colors shadow-inner">
                             <option value="">Select...</option>
                             <option value="NEW" className="font-bold text-teal-400">+ New Cat</option>
                             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -477,11 +486,11 @@ export default function PurchaseBillsPage() {
                       <td className="py-3 px-2">
                         {line.isNewBrand ? (
                           <div className="flex gap-1 relative">
-                            <input type="text" placeholder="New Brand..." value={line.newBrandName} onChange={e => updateAllocLine(line.id, "newBrandName", e.target.value)} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none focus:border-teal-500 transition-colors" autoFocus />
+                            <input type="text" placeholder="New Brand..." value={line.newBrandName} onChange={e => updateAllocLine(line.id, "newBrandName", e.target.value)} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" autoFocus />
                             <button onClick={() => updateAllocLine(line.id, "brandId", "")} className="absolute right-1 top-1.5 text-xs text-rose-500 hover:text-rose-400 font-bold px-1">&times;</button>
                           </div>
                         ) : (
-                          <select value={line.brandId} onChange={e => updateAllocLine(line.id, "brandId", e.target.value)} disabled={!line.isNewItem} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none focus:border-teal-500 disabled:opacity-50 transition-colors">
+                          <select value={line.brandId} onChange={e => updateAllocLine(line.id, "brandId", e.target.value)} disabled={!line.isNewItem} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 disabled:opacity-50 transition-colors shadow-inner">
                             <option value="">Select...</option>
                             <option value="NEW" className="font-bold text-teal-400">+ New Brand</option>
                             {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -492,11 +501,11 @@ export default function PurchaseBillsPage() {
                       <td className="py-3 px-2">
                         {line.isNewUnit ? (
                           <div className="flex gap-1 relative">
-                            <input type="text" placeholder="New Unit..." value={line.newUnitName} onChange={e => updateAllocLine(line.id, "newUnitName", e.target.value)} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none focus:border-teal-500 transition-colors" autoFocus />
+                            <input type="text" placeholder="New Unit..." value={line.newUnitName} onChange={e => updateAllocLine(line.id, "newUnitName", e.target.value)} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 transition-colors shadow-inner" autoFocus />
                             <button onClick={() => updateAllocLine(line.id, "unitId", "")} className="absolute right-1 top-1.5 text-xs text-rose-500 hover:text-rose-400 font-bold px-1">&times;</button>
                           </div>
                         ) : (
-                          <select value={line.unitId} onChange={e => updateAllocLine(line.id, "unitId", e.target.value)} disabled={!line.isNewItem} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none focus:border-teal-500 disabled:opacity-50 transition-colors">
+                          <select value={line.unitId} onChange={e => updateAllocLine(line.id, "unitId", e.target.value)} disabled={!line.isNewItem} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-teal-500/50 disabled:opacity-50 transition-colors shadow-inner">
                             <option value="">Select...</option>
                             <option value="NEW" className="font-bold text-teal-400">+ New Unit</option>
                             {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -504,99 +513,99 @@ export default function PurchaseBillsPage() {
                         )}
                       </td>
 
-                      <td className="py-3 px-2"><input type="number" min="0" value={line.yieldQty} onChange={e => updateAllocLine(line.id, "yieldQty", e.target.value)} className="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-1.5 text-xs outline-none text-center focus:border-teal-500 transition-colors" /></td>
-                      <td className="py-3 px-2"><input type="number" min="0" value={line.weightGrams} onChange={e => updateAllocLine(line.id, "weightGrams", e.target.value)} className="w-full bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded p-1.5 text-xs outline-none text-center focus:border-amber-500 font-bold transition-colors" /></td>
-                      <td className="py-3 px-2"><input type="number" min="0" value={line.unitCost} readOnly className="w-full bg-zinc-900 text-zinc-500 border border-zinc-800 rounded p-1.5 text-xs outline-none text-right font-bold cursor-not-allowed" /></td>
-                      <td className="py-3 px-2"><input type="number" min="0" value={line.totalCost} onChange={e => updateAllocLine(line.id, "totalCost", e.target.value)} className="w-full bg-teal-500/10 text-teal-300 border border-teal-500/30 rounded p-1.5 text-xs outline-none text-right font-bold focus:border-teal-500 transition-colors" /></td>
+                      <td className="py-3 px-2"><input type="number" min="0" value={line.yieldQty} onChange={e => updateAllocLine(line.id, "yieldQty", e.target.value)} className="w-full bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg p-1.5 text-xs outline-none text-center focus:border-teal-500/50 transition-colors shadow-inner" /></td>
+                      <td className="py-3 px-2"><input type="number" min="0" value={line.weightGrams} onChange={e => updateAllocLine(line.id, "weightGrams", e.target.value)} className="w-full bg-amber-500/20 backdrop-blur-sm text-amber-300 border border-amber-500/30 rounded-lg p-1.5 text-xs outline-none text-center focus:border-amber-500/50 font-bold transition-colors shadow-inner" /></td>
+                      <td className="py-3 px-2"><input type="number" min="0" value={line.unitCost} readOnly className="w-full bg-white/5 backdrop-blur-sm text-zinc-400 border border-white/5 rounded-lg p-1.5 text-xs outline-none text-right font-bold cursor-not-allowed" /></td>
+                      <td className="py-3 px-2"><input type="number" min="0" value={line.totalCost} onChange={e => updateAllocLine(line.id, "totalCost", e.target.value)} className="w-full bg-teal-500/20 backdrop-blur-sm text-teal-300 border border-teal-500/30 rounded-lg p-1.5 text-xs outline-none text-right font-bold focus:border-teal-500/50 transition-colors shadow-inner" /></td>
                       
-                      <td className="py-3 px-2 text-center"><button onClick={() => setAllocLines(prev => prev.filter(l => l.id !== line.id))} className="text-zinc-600 hover:text-rose-500 font-bold transition-colors"><Trash2 className="w-4 h-4 mx-auto"/></button></td>
+                      <td className="py-3 px-2 text-center"><button onClick={() => setAllocLines(prev => prev.filter(l => l.id !== line.id))} className="text-zinc-500 hover:text-rose-500 font-bold transition-colors"><Trash2 className="w-4 h-4 mx-auto"/></button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <button onClick={addAllocLine} className="mt-4 text-xs font-bold text-teal-400 hover:text-teal-300 uppercase tracking-widest flex items-center gap-1 transition-colors"><Plus className="w-3 h-3"/> Add Row</button>
+              <button onClick={addAllocLine} className="mt-4 text-xs font-bold text-teal-400 hover:text-teal-300 uppercase tracking-widest flex items-center gap-1 transition-colors drop-shadow-sm"><Plus className="w-3 h-3"/> Add Row</button>
             </div>
 
-            <div className="border-t border-zinc-800 flex flex-col lg:flex-row gap-0 bg-zinc-900">
+            <div className="border-t border-white/5 flex flex-col lg:flex-row gap-0 bg-zinc-900/30 relative z-10">
               
-              <div className="p-6 lg:w-1/3 border-r border-zinc-800 space-y-4">
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-4">Adjustments & Extra Costs</h3>
+              <div className="p-6 lg:w-1/3 border-r border-white/5 space-y-4">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">Adjustments & Extra Costs</h3>
                 
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-zinc-400 flex items-center gap-2">Discount 
-                    <button onClick={() => setDiscountType(t => t === "FLAT" ? "PERCENT" : "FLAT")} className="text-[10px] bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded font-bold hover:bg-zinc-700 text-zinc-300 transition-colors">{discountType === "FLAT" ? "₨" : "%"}</button>
+                  <span className="text-zinc-300 flex items-center gap-2">Discount 
+                    <button onClick={() => setDiscountType(t => t === "FLAT" ? "PERCENT" : "FLAT")} className="text-[10px] bg-white/10 border border-white/10 px-2 py-0.5 rounded font-bold hover:bg-white/20 text-white transition-colors">{discountType === "FLAT" ? "₨" : "%"}</button>
                   </span>
-                  <input type="number" min="0" value={discountVal} onChange={e => setDiscountVal(e.target.value)} className="w-24 bg-zinc-950 text-zinc-200 border border-zinc-700 rounded px-2 py-1.5 outline-none text-right focus:border-teal-500 text-xs transition-colors" />
+                  <input type="number" min="0" value={discountVal} onChange={e => setDiscountVal(e.target.value)} className="w-24 bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg px-2 py-1.5 outline-none text-right focus:border-teal-500/50 text-xs transition-colors shadow-inner" />
                 </div>
                 
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-zinc-400">Adjustment (+/-)</span>
-                  <input type="number" value={adjustmentVal} onChange={e => setAdjustmentVal(e.target.value)} className="w-24 bg-zinc-950 text-zinc-200 border border-zinc-700 rounded px-2 py-1.5 outline-none text-right focus:border-teal-500 text-xs transition-colors" />
+                  <span className="text-zinc-300">Adjustment (+/-)</span>
+                  <input type="number" value={adjustmentVal} onChange={e => setAdjustmentVal(e.target.value)} className="w-24 bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg px-2 py-1.5 outline-none text-right focus:border-teal-500/50 text-xs transition-colors shadow-inner" />
                 </div>
                 
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-zinc-400">Delivery (Expensed)</span>
-                  <input type="number" min="0" value={deliveryCharges} onChange={e => setDeliveryCharges(e.target.value)} className="w-24 bg-zinc-950 text-zinc-200 border border-zinc-700 rounded px-2 py-1.5 outline-none text-right focus:border-teal-500 text-xs transition-colors" />
+                  <span className="text-zinc-300">Delivery (Expensed)</span>
+                  <input type="number" min="0" value={deliveryCharges} onChange={e => setDeliveryCharges(e.target.value)} className="w-24 bg-zinc-950/50 backdrop-blur-sm text-white border border-white/10 rounded-lg px-2 py-1.5 outline-none text-right focus:border-teal-500/50 text-xs transition-colors shadow-inner" />
                 </div>
                 
-                <div className="flex justify-between items-center text-sm pt-4 mt-2 border-t border-zinc-800">
-                  <span className="text-amber-500 font-semibold">Carton/Scrap Wt. (g)</span>
-                  <input type="number" min="0" placeholder="1500" value={cartonWeight} onChange={e => setCartonWeight(e.target.value)} className="w-24 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded px-2 py-1.5 outline-none text-right font-bold focus:border-amber-500 text-xs transition-colors" />
+                <div className="flex justify-between items-center text-sm pt-4 mt-2 border-t border-white/5">
+                  <span className="text-amber-400 font-semibold drop-shadow-sm">Carton/Scrap Wt. (g)</span>
+                  <input type="number" min="0" placeholder="1500" value={cartonWeight} onChange={e => setCartonWeight(e.target.value)} className="w-24 bg-amber-500/20 backdrop-blur-sm text-amber-300 border border-amber-500/30 rounded-lg px-2 py-1.5 outline-none text-right font-bold focus:border-amber-500/50 text-xs transition-colors shadow-inner" />
                 </div>
                 
-                <button onClick={autoDistributeCosts} className="w-full mt-4 bg-zinc-800 hover:bg-zinc-700 text-teal-400 border border-zinc-700 rounded-lg py-2.5 text-xs font-bold uppercase tracking-widest transition-colors shadow-sm">
+                <button onClick={autoDistributeCosts} className="w-full mt-4 bg-white/5 hover:bg-white/10 backdrop-blur-md text-teal-400 border border-white/10 rounded-xl py-2.5 text-xs font-bold uppercase tracking-widest transition-all shadow-sm">
                   Auto-Distribute Costs by Weight
                 </button>
               </div>
 
-              <div className="bg-zinc-950 p-6 lg:w-2/3 flex flex-col justify-between">
+              <div className="bg-zinc-950/20 p-6 lg:w-2/3 flex flex-col justify-between">
                 
                 <div className="flex flex-col gap-4 mb-6">
                   {/* Weight Balancer */}
-                  <div className="flex flex-wrap justify-between items-center gap-4 bg-zinc-900 p-4 rounded-xl border border-zinc-800 shadow-sm">
+                  <div className="flex flex-wrap justify-between items-center gap-4 bg-zinc-950/40 backdrop-blur-sm p-4 rounded-2xl border border-white/5 shadow-inner">
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Target Bulk Weight</div>
-                      <div className="text-lg font-bold text-white mt-0.5">{targetWeight} <span className="text-sm text-zinc-400">g</span></div>
+                      <div className="text-lg font-bold text-white mt-0.5 drop-shadow-sm">{targetWeight} <span className="text-sm text-zinc-400">g</span></div>
                     </div>
-                    <div className="text-zinc-700 text-xl font-light">-</div>
+                    <div className="text-zinc-600 text-xl font-light">-</div>
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Allocated Wt.</div>
-                      <div className="text-lg font-bold text-amber-500 mt-0.5">{allocatedItemsWeight} <span className="text-sm text-amber-500/50">g</span></div>
+                      <div className="text-lg font-bold text-amber-400 mt-0.5 drop-shadow-sm">{allocatedItemsWeight} <span className="text-sm text-amber-400/50">g</span></div>
                     </div>
-                    <div className="text-zinc-700 text-xl font-light">-</div>
+                    <div className="text-zinc-600 text-xl font-light">-</div>
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Carton Wt.</div>
-                      <div className="text-lg font-bold text-zinc-400 mt-0.5">{Number(cartonWeight) || 0} <span className="text-sm text-zinc-600">g</span></div>
+                      <div className="text-lg font-bold text-zinc-300 mt-0.5">{Number(cartonWeight) || 0} <span className="text-sm text-zinc-500">g</span></div>
                     </div>
-                    <div className="text-zinc-700 text-xl font-light">=</div>
-                    <div className="bg-zinc-950 px-5 py-2 rounded-lg border border-zinc-800">
+                    <div className="text-zinc-600 text-xl font-light">=</div>
+                    <div className="bg-zinc-950/60 backdrop-blur-md px-5 py-2 rounded-xl border border-white/5 shadow-inner">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Weight Balance</div>
-                      <div className={`text-xl font-black mt-0.5 ${Math.abs(weightBalanceRemaining) < 0.5 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                      <div className={`text-xl font-black mt-0.5 drop-shadow-sm ${Math.abs(weightBalanceRemaining) < 0.5 ? 'text-emerald-400' : 'text-rose-500'}`}>
                         {weightBalanceRemaining} <span className="text-sm font-bold opacity-50">g</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Amount Balancer */}
-                  <div className="flex flex-wrap justify-between items-center gap-4 bg-zinc-900 p-4 rounded-xl border border-zinc-800 shadow-sm">
+                  <div className="flex flex-wrap justify-between items-center gap-4 bg-zinc-950/40 backdrop-blur-sm p-4 rounded-2xl border border-white/5 shadow-inner">
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Target Bill Total</div>
-                      <div className="text-lg font-bold text-white mt-0.5">{money(targetTotal)}</div>
+                      <div className="text-lg font-bold text-white mt-0.5 drop-shadow-sm">{money(targetTotal)}</div>
                     </div>
-                    <div className="text-zinc-700 text-xl font-light">-</div>
+                    <div className="text-zinc-600 text-xl font-light">-</div>
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Items Subtotal</div>
-                      <div className="text-lg font-bold text-teal-400 mt-0.5">{money(itemsSubtotal)}</div>
+                      <div className="text-lg font-bold text-teal-400 mt-0.5 drop-shadow-sm">{money(itemsSubtotal)}</div>
                     </div>
-                    <div className="text-zinc-700 text-xl font-light">+/-</div>
+                    <div className="text-zinc-600 text-xl font-light">+/-</div>
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Adj. & Delivery</div>
-                      <div className="text-lg font-bold text-zinc-400 mt-0.5">{money(calcAdjustment + calcDelivery - calcDiscount)}</div>
+                      <div className="text-lg font-bold text-zinc-300 mt-0.5">{money(calcAdjustment + calcDelivery - calcDiscount)}</div>
                     </div>
-                    <div className="text-zinc-700 text-xl font-light">=</div>
-                    <div className="bg-zinc-950 px-5 py-2 rounded-lg border border-zinc-800">
+                    <div className="text-zinc-600 text-xl font-light">=</div>
+                    <div className="bg-zinc-950/60 backdrop-blur-md px-5 py-2 rounded-xl border border-white/5 shadow-inner">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Amount Balance</div>
-                      <div className={`text-xl font-black mt-0.5 ${Math.abs(amountBalanceRemaining) < 0.05 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                      <div className={`text-xl font-black mt-0.5 drop-shadow-sm ${Math.abs(amountBalanceRemaining) < 0.05 ? 'text-emerald-400' : 'text-rose-500'}`}>
                         {money(amountBalanceRemaining)}
                       </div>
                     </div>
@@ -604,11 +613,11 @@ export default function PurchaseBillsPage() {
                 </div>
 
                 <div className="flex justify-end gap-3 mt-4">
-                  <button onClick={() => setAllocatingBill(null)} disabled={isSubmitting} className="px-6 py-2.5 text-sm font-semibold text-zinc-400 hover:text-white bg-transparent hover:bg-zinc-800 rounded-lg transition-colors border border-transparent hover:border-zinc-700">Cancel</button>
+                  <button onClick={() => setAllocatingBill(null)} disabled={isSubmitting} className="px-6 py-2.5 text-sm font-semibold text-zinc-400 hover:text-white bg-transparent hover:bg-white/5 rounded-xl transition-colors border border-transparent hover:border-white/10 backdrop-blur-sm">Cancel</button>
                   <button 
                     onClick={submitAllocation} 
                     disabled={isSubmitting || Math.abs(amountBalanceRemaining) > 0.05 || Math.abs(weightBalanceRemaining) > 0.5} 
-                    className="px-6 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                    className="px-6 py-2.5 text-sm font-semibold text-white bg-teal-600/80 hover:bg-teal-500 backdrop-blur-md border border-teal-500/50 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-[0_4px_12px_rgba(20,184,166,0.3)] transition-all flex items-center gap-2"
                   >
                     {isSubmitting ? "Finalizing..." : "Finalize Adjustment"}
                   </button>
@@ -623,10 +632,10 @@ export default function PurchaseBillsPage() {
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(82, 82, 91, 0.5); border-radius: 8px; }
-        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(113, 113, 122, 0.8); }
-        .animate-fade-in { animation: fadeIn 0.15s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); }
+        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
       `}} />
     </div>
   );
