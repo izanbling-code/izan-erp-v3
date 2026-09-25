@@ -24,14 +24,19 @@ function writeFallback(data: any) {
 export async function GET() {
   try {
     let settings = readFallback();
-    // Attempt reading company model for currency & name sync
+    
+    // Attempt reading company model to keep DB and settings perfectly synced
     try {
       const company = await prisma.company.findFirst();
       if (company) {
         settings.general.companyName = company.name || settings.general.companyName;
-        settings.general.currency = company.currency || settings.general.currency;
+        settings.general.legalName = company.legalName || settings.general.legalName;
         settings.general.ntn = company.ntn || settings.general.ntn;
+        settings.general.email = company.email || settings.general.email;
+        settings.general.phone = company.phone || settings.general.phone;
+        settings.general.address = company.address || settings.general.address;
         settings.general.country = company.country || settings.general.country;
+        settings.general.currency = company.currency || settings.general.currency;
       }
     } catch (e) {}
 
@@ -45,24 +50,32 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const current = readFallback();
+    
+    // Merge all 5 categories safely
     const updated = {
       general: { ...current.general, ...(body.general || {}) },
       purchases: { ...current.purchases, ...(body.purchases || {}) },
       sales: { ...current.sales, ...(body.sales || {}) },
       inventory: { ...current.inventory, ...(body.inventory || {}) },
+      numbering: { ...current.numbering, ...(body.numbering || {}) },
     };
 
     writeFallback(updated);
 
-    // Sync with company database table
+    // Sync the general settings back to the Prisma company table
     try {
       const comp = await prisma.company.findFirst();
       const compData = {
         name: updated.general.companyName,
-        currency: updated.general.currency,
+        legalName: updated.general.legalName,
         ntn: updated.general.ntn,
+        email: updated.general.email,
+        phone: updated.general.phone,
+        address: updated.general.address,
         country: updated.general.country,
+        currency: updated.general.currency,
       };
+      
       if (comp) {
         await prisma.company.update({ where: { id: comp.id }, data: compData });
       } else {
