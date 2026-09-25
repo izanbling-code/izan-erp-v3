@@ -2,6 +2,9 @@
   companyName: string;
   legalName: string;
   ntn: string;
+  email: string;
+  phone: string;
+  address: string;
   country: string;
   currency: string;
   dateFormat: "DD/MM/YYYY" | "MM/DD/YYYY" | "YYYY-MM-DD";
@@ -16,38 +19,30 @@ export interface PurchaseSettings {
   allowTax: boolean;
   requireWarehouse: boolean;
   requireBatch: boolean;
-  inventoryUpdateTiming: "POSTED" | "RECEIVED";
-  allowPurchaseReturns: boolean;
-  requireSupplier: boolean;
-  allowPartialPayments: boolean;
-  autoCalculateBalance: boolean;
+  inventoryUpdateTiming: "ON_POST" | "ON_RECEIPT";
 }
 
 export interface SalesSettings {
+  allowCashSales: boolean;
+  allowPartialPayments: boolean;
+  requireCustomer: boolean;
   requireWarehouse: boolean;
   requireBatchSelection: boolean;
-  allowNegativeStock: boolean;
-  updateInventoryOn: string;
-  allowCashSales: boolean;
-  requireCustomer: boolean;
-  allowPartialPayments: boolean;
-  autoCalculateBalance: boolean;
 }
 
 export interface InventorySettings {
-  enableInventoryTracking: boolean;
-  enableBatchTracking: boolean;
-  requireWarehouse: boolean;
   allowNegativeStock: boolean;
-  costingMethod: string;
-  useActualBatchCost: boolean;
-  updateAverageCost: boolean;
-  updateStockAutomatically: boolean;
   allowStockAdjustments: boolean;
-  allowWarehouseTransfers: boolean;
-  allowOpeningStock: boolean;
+  costingMethod: "BATCH_ACTUAL" | "MOVING_AVERAGE";
   enableReorderAlerts: boolean;
-  useProductReorderLevel: boolean;
+}
+
+export interface NumberingSettings {
+  invoicePrefix: string;
+  purchaseBillPrefix: string;
+  journalPrefix: string;
+  nextInvoiceNumber: number;
+  nextPurchaseBillNumber: number;
 }
 
 export interface ERPSystemSettings {
@@ -55,13 +50,17 @@ export interface ERPSystemSettings {
   purchases: PurchaseSettings;
   sales: SalesSettings;
   inventory: InventorySettings;
+  numbering: NumberingSettings;
 }
 
 export const DEFAULT_ERP_SETTINGS: ERPSystemSettings = {
   general: {
     companyName: "Izan Bling",
     legalName: "",
-    ntn: "J075690-0",
+    ntn: "",
+    email: "",
+    phone: "",
+    address: "",
     country: "Pakistan",
     currency: "PKR",
     dateFormat: "DD/MM/YYYY",
@@ -70,40 +69,31 @@ export const DEFAULT_ERP_SETTINGS: ERPSystemSettings = {
   },
   purchases: {
     defaultBillStatus: "DRAFT",
-    defaultPaymentTerms: "Due on Receipt",
+    defaultPaymentTerms: "Net 30",
     allowDiscounts: true,
     allowTax: true,
     requireWarehouse: true,
     requireBatch: true,
-    inventoryUpdateTiming: "POSTED",
-    allowPurchaseReturns: true,
-    requireSupplier: true,
-    allowPartialPayments: true,
-    autoCalculateBalance: true,
+    inventoryUpdateTiming: "ON_POST",
   },
   sales: {
+    allowCashSales: true,
+    allowPartialPayments: true,
+    requireCustomer: true,
     requireWarehouse: true,
     requireBatchSelection: true,
-    allowNegativeStock: false,
-    updateInventoryOn: "Invoice Posting",
-    allowCashSales: true,
-    requireCustomer: true,
-    allowPartialPayments: true,
-    autoCalculateBalance: true,
   },
   inventory: {
-    enableInventoryTracking: true,
-    enableBatchTracking: false,
-    requireWarehouse: true,
     allowNegativeStock: false,
-    costingMethod: "Batch Cost",
-    useActualBatchCost: true,
-    updateAverageCost: true,
-    updateStockAutomatically: true,
     allowStockAdjustments: true,
-    allowWarehouseTransfers: true,
-    allowOpeningStock: true,
+    costingMethod: "BATCH_ACTUAL",
     enableReorderAlerts: true,
-    useProductReorderLevel: true,
+  },
+  numbering: {
+    invoicePrefix: "INV-",
+    purchaseBillPrefix: "PB-",
+    journalPrefix: "JRN-",
+    nextInvoiceNumber: 1,
+    nextPurchaseBillNumber: 1,
   },
 };
