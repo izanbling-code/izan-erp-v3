@@ -1,5 +1,3 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* The IPRoyal Glass custom scrollbar will be handled inline in components */
