@@ -4,15 +4,14 @@ import { useState, useEffect } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import ERPShell from "@/app/components/erp-shell";
 import { useERPConfig } from "@/app/contexts/SettingsContext";
-import { Save, Settings2, ShoppingCart, ShoppingBag, Package } from "lucide-react";
+import { Save, Settings2, ShoppingCart, ShoppingBag, Package, Hash } from "lucide-react";
 
 export default function SettingsPage() {
   const { settings, updateCategory, loading } = useERPConfig();
-  const [activeTab, setActiveTab] = useState<"general" | "sales" | "purchases" | "inventory">("sales");
+  const [activeTab, setActiveTab] = useState<"general" | "sales" | "purchases" | "inventory" | "numbering">("general");
   const [formData, setFormData] = useState(settings);
   const [saving, setSaving] = useState(false);
 
-  // Sync form when global settings load
   useEffect(() => {
     setFormData(settings);
   }, [settings]);
@@ -40,6 +39,7 @@ export default function SettingsPage() {
     { id: "sales", label: "Sales", icon: <ShoppingCart className="w-4 h-4" /> },
     { id: "purchases", label: "Purchases", icon: <ShoppingBag className="w-4 h-4" /> },
     { id: "inventory", label: "Inventory", icon: <Package className="w-4 h-4" /> },
+    { id: "numbering", label: "Numbering", icon: <Hash className="w-4 h-4" /> },
   ] as const;
 
   return (
@@ -48,13 +48,12 @@ export default function SettingsPage() {
       <ERPShell title="System Settings">
         <div className="max-w-7xl mx-auto p-8 flex flex-col md:flex-row gap-8">
           
-          {/* Sidebar Navigation */}
           <div className="w-full md:w-64 shrink-0 space-y-2">
             <h2 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-4 px-4 drop-shadow-sm">Configuration</h2>
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setActiveTab(tab.id as any)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
                   activeTab === tab.id 
                     ? "bg-teal-50 dark:bg-white/10 text-teal-700 dark:text-white shadow-sm border border-teal-200 dark:border-white/5" 
@@ -66,7 +65,6 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          {/* Main Content Pane (IPRoyal Glass) */}
           <div className="flex-1 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 dark:border-white/5 overflow-hidden flex flex-col min-h-[650px]">
             <div className="p-6 border-b border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-zinc-950/30 flex justify-between items-center">
               <div>
@@ -77,59 +75,75 @@ export default function SettingsPage() {
             
             <div className="p-8 flex-1 overflow-y-auto space-y-8 custom-scrollbar">
               
-              {activeTab === "sales" && (
+              {activeTab === "general" && (
                 <div className="space-y-8">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-white/10 pb-2">Customer & Payment Defaults</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-white/10 pb-2">Company Profile</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <ToggleField label="Allow Cash Sales" value={formData.sales.allowCashSales} onChange={(val) => setFormData({...formData, sales: {...formData.sales, allowCashSales: val}})} />
-                      <ToggleField label="Require Customer" value={formData.sales.requireCustomer} onChange={(val) => setFormData({...formData, sales: {...formData.sales, requireCustomer: val}})} />
-                      <ToggleField label="Allow Partial Payments" value={formData.sales.allowPartialPayments} onChange={(val) => setFormData({...formData, sales: {...formData.sales, allowPartialPayments: val}})} />
-                      <ToggleField label="Auto-Calculate Balance" value={formData.sales.autoCalculateBalance} onChange={(val) => setFormData({...formData, sales: {...formData.sales, autoCalculateBalance: val}})} />
+                      <InputField label="Company Name" value={formData.general.companyName} onChange={(val) => setFormData({...formData, general: {...formData.general, companyName: val}})} />
+                      <InputField label="Legal Name" value={formData.general.legalName} onChange={(val) => setFormData({...formData, general: {...formData.general, legalName: val}})} />
+                      <InputField label="NTN / Tax ID" value={formData.general.ntn} onChange={(val) => setFormData({...formData, general: {...formData.general, ntn: val}})} />
+                      <InputField label="Email" value={formData.general.email} onChange={(val) => setFormData({...formData, general: {...formData.general, email: val}})} />
+                      <InputField label="Phone" value={formData.general.phone} onChange={(val) => setFormData({...formData, general: {...formData.general, phone: val}})} />
+                      <InputField label="Address" value={formData.general.address} onChange={(val) => setFormData({...formData, general: {...formData.general, address: val}})} />
+                      <InputField label="Country" value={formData.general.country} onChange={(val) => setFormData({...formData, general: {...formData.general, country: val}})} />
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-white/10 pb-2">Inventory Control</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-white/10 pb-2">Regional Settings</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <ToggleField label="Require Warehouse" value={formData.sales.requireWarehouse} onChange={(val) => setFormData({...formData, sales: {...formData.sales, requireWarehouse: val}})} />
-                      <ToggleField label="Allow Negative Stock" value={formData.sales.allowNegativeStock} onChange={(val) => setFormData({...formData, sales: {...formData.sales, allowNegativeStock: val}})} />
+                      <InputField label="Base Currency (e.g. PKR, USD)" value={formData.general.currency} onChange={(val) => setFormData({...formData, general: {...formData.general, currency: val}})} />
+                      <SelectField label="Decimal Places" value={formData.general.decimalPlaces.toString()} options={[{label: "0", value: "0"}, {label: "2", value: "2"}, {label: "3", value: "3"}]} onChange={(val) => setFormData({...formData, general: {...formData.general, decimalPlaces: Number(val)}})} />
+                      <SelectField label="Date Format" value={formData.general.dateFormat} options={[{label: "DD/MM/YYYY", value: "DD/MM/YYYY"}, {label: "MM/DD/YYYY", value: "MM/DD/YYYY"}, {label: "YYYY-MM-DD", value: "YYYY-MM-DD"}]} onChange={(val) => setFormData({...formData, general: {...formData.general, dateFormat: val as any}})} />
+                      <InputField label="Time Zone" value={formData.general.timeZone} onChange={(val) => setFormData({...formData, general: {...formData.general, timeZone: val}})} />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {activeTab === "sales" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ToggleField label="Allow Cash Sales" value={formData.sales.allowCashSales} onChange={(val) => setFormData({...formData, sales: {...formData.sales, allowCashSales: val}})} />
+                  <ToggleField label="Require Customer" value={formData.sales.requireCustomer} onChange={(val) => setFormData({...formData, sales: {...formData.sales, requireCustomer: val}})} />
+                  <ToggleField label="Allow Partial Payments" value={formData.sales.allowPartialPayments} onChange={(val) => setFormData({...formData, sales: {...formData.sales, allowPartialPayments: val}})} />
+                  <ToggleField label="Require Warehouse Selection" value={formData.sales.requireWarehouse} onChange={(val) => setFormData({...formData, sales: {...formData.sales, requireWarehouse: val}})} />
+                  <ToggleField label="Require Batch Selection" value={formData.sales.requireBatchSelection} onChange={(val) => setFormData({...formData, sales: {...formData.sales, requireBatchSelection: val}})} />
                 </div>
               )}
 
               {activeTab === "purchases" && (
-                <div className="space-y-8">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-white/10 pb-2">Purchase Behaviours</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <ToggleField label="Allow Discounts" value={formData.purchases.allowDiscounts} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, allowDiscounts: val}})} />
-                      <ToggleField label="Allow Tax" value={formData.purchases.allowTax} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, allowTax: val}})} />
-                      <ToggleField label="Require Warehouse" value={formData.purchases.requireWarehouse} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, requireWarehouse: val}})} />
-                      <ToggleField label="Require Batch Number" value={formData.purchases.requireBatch} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, requireBatch: val}})} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "general" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <InputField label="Company Name" value={formData.general.companyName} onChange={(val) => setFormData({...formData, general: {...formData.general, companyName: val}})} />
-                   <InputField label="Currency Display (e.g. PKR, USD)" value={formData.general.currency} onChange={(val) => setFormData({...formData, general: {...formData.general, currency: val}})} />
-                   <InputField label="NTN / Tax ID" value={formData.general.ntn} onChange={(val) => setFormData({...formData, general: {...formData.general, ntn: val}})} />
+                  <SelectField label="Default Bill Status" value={formData.purchases.defaultBillStatus} options={[{label: "Draft", value: "DRAFT"}, {label: "Posted", value: "POSTED"}]} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, defaultBillStatus: val as any}})} />
+                  <InputField label="Default Payment Terms" value={formData.purchases.defaultPaymentTerms} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, defaultPaymentTerms: val}})} />
+                  <ToggleField label="Allow Discounts" value={formData.purchases.allowDiscounts} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, allowDiscounts: val}})} />
+                  <ToggleField label="Allow Tax" value={formData.purchases.allowTax} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, allowTax: val}})} />
+                  <ToggleField label="Require Warehouse" value={formData.purchases.requireWarehouse} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, requireWarehouse: val}})} />
+                  <ToggleField label="Require Batch" value={formData.purchases.requireBatch} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, requireBatch: val}})} />
+                  <SelectField label="Inventory Update Timing" value={formData.purchases.inventoryUpdateTiming} options={[{label: "On Post", value: "ON_POST"}, {label: "On Receipt", value: "ON_RECEIPT"}]} onChange={(val) => setFormData({...formData, purchases: {...formData.purchases, inventoryUpdateTiming: val as any}})} />
                 </div>
               )}
 
               {activeTab === "inventory" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <ToggleField label="Enable Global Inventory Tracking" value={formData.inventory.enableInventoryTracking} onChange={(val) => setFormData({...formData, inventory: {...formData.inventory, enableInventoryTracking: val}})} />
-                   <ToggleField label="Update Stock Automatically" value={formData.inventory.updateStockAutomatically} onChange={(val) => setFormData({...formData, inventory: {...formData.inventory, updateStockAutomatically: val}})} />
+                  <ToggleField label="Allow Negative Stock" value={formData.inventory.allowNegativeStock} onChange={(val) => setFormData({...formData, inventory: {...formData.inventory, allowNegativeStock: val}})} />
+                  <ToggleField label="Allow Stock Adjustments" value={formData.inventory.allowStockAdjustments} onChange={(val) => setFormData({...formData, inventory: {...formData.inventory, allowStockAdjustments: val}})} />
+                  <ToggleField label="Enable Reorder Alerts" value={formData.inventory.enableReorderAlerts} onChange={(val) => setFormData({...formData, inventory: {...formData.inventory, enableReorderAlerts: val}})} />
+                  <SelectField label="Costing Method" value={formData.inventory.costingMethod} options={[{label: "Batch Actual", value: "BATCH_ACTUAL"}, {label: "Moving Average", value: "MOVING_AVERAGE"}]} onChange={(val) => setFormData({...formData, inventory: {...formData.inventory, costingMethod: val as any}})} />
+                </div>
+              )}
+
+              {activeTab === "numbering" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <InputField label="Invoice Prefix" value={formData.numbering.invoicePrefix} onChange={(val) => setFormData({...formData, numbering: {...formData.numbering, invoicePrefix: val}})} />
+                  <InputField label="Purchase Bill Prefix" value={formData.numbering.purchaseBillPrefix} onChange={(val) => setFormData({...formData, numbering: {...formData.numbering, purchaseBillPrefix: val}})} />
+                  <InputField label="Journal Prefix" value={formData.numbering.journalPrefix} onChange={(val) => setFormData({...formData, numbering: {...formData.numbering, journalPrefix: val}})} />
+                  <InputField label="Next Invoice Sequence" value={formData.numbering.nextInvoiceNumber.toString()} onChange={(val) => setFormData({...formData, numbering: {...formData.numbering, nextInvoiceNumber: Number(val) || 1}})} />
+                  <InputField label="Next Purchase Bill Sequence" value={formData.numbering.nextPurchaseBillNumber.toString()} onChange={(val) => setFormData({...formData, numbering: {...formData.numbering, nextPurchaseBillNumber: Number(val) || 1}})} />
                 </div>
               )}
 
             </div>
 
-            {/* Sticky Save Footer */}
             <div className="p-6 border-t border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-zinc-950/30 flex justify-end">
               <button onClick={handleSave} disabled={saving} className="bg-teal-600 hover:bg-teal-500 text-white px-8 py-3 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-teal-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                 <Save className="w-4 h-4" /> {saving ? "Saving Configuration..." : "Save Changes"}
@@ -143,7 +157,6 @@ export default function SettingsPage() {
   );
 }
 
-// Reusable IPRoyal Styled Toggle
 function ToggleField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className="flex flex-col gap-3 p-5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950/50 shadow-inner">
@@ -163,17 +176,33 @@ function ToggleField({ label, value, onChange }: { label: string; value: boolean
   );
 }
 
-// Reusable IPRoyal Styled Input
 function InputField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex flex-col gap-3 p-5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950/50 shadow-inner">
       <span className="text-sm font-bold text-slate-700 dark:text-zinc-300">{label}</span>
       <input 
         type="text" 
-        value={value} 
+        value={value || ""} 
         onChange={(e) => onChange(e.target.value)} 
         className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 px-4 py-2.5 rounded-lg text-sm outline-none focus:border-teal-500 text-slate-900 dark:text-white transition-colors" 
       />
+    </div>
+  );
+}
+
+function SelectField({ label, value, options, onChange }: { label: string; value: string; options: {label: string, value: string}[]; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-col gap-3 p-5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950/50 shadow-inner">
+      <span className="text-sm font-bold text-slate-700 dark:text-zinc-300">{label}</span>
+      <select 
+        value={value || ""} 
+        onChange={(e) => onChange(e.target.value)} 
+        className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 px-4 py-2.5 rounded-lg text-sm outline-none focus:border-teal-500 text-slate-900 dark:text-white transition-colors"
+      >
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
     </div>
   );
 }
