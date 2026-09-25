@@ -45,12 +45,22 @@ export interface NumberingSettings {
   nextPurchaseBillNumber: number;
 }
 
+export interface AppearanceSettings {
+  theme: "light" | "dark" | "system";
+  sidebarMode: "expanded" | "collapsed";
+  dataDensity: "compact" | "comfortable";
+  invoiceTemplate: "modern" | "classic" | "thermal";
+  receiptTemplate: "standard" | "minimalist" | "thermal";
+  showLogoOnPrints: boolean;
+}
+
 export interface ERPSystemSettings {
   general: GeneralSettings;
   purchases: PurchaseSettings;
   sales: SalesSettings;
   inventory: InventorySettings;
   numbering: NumberingSettings;
+  appearance: AppearanceSettings;
 }
 
 export const DEFAULT_ERP_SETTINGS: ERPSystemSettings = {
@@ -95,5 +105,13 @@ export const DEFAULT_ERP_SETTINGS: ERPSystemSettings = {
     journalPrefix: "JRN-",
     nextInvoiceNumber: 1,
     nextPurchaseBillNumber: 1,
+  },
+  appearance: {
+    theme: "system",
+    sidebarMode: "expanded",
+    dataDensity: "comfortable",
+    invoiceTemplate: "modern",
+    receiptTemplate: "standard",
+    showLogoOnPrints: true,
   },
 };

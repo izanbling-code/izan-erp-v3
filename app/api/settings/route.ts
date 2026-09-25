@@ -25,7 +25,6 @@ export async function GET() {
   try {
     let settings = readFallback();
     
-    // Attempt reading company model to keep DB and settings perfectly synced
     try {
       const company = await prisma.company.findFirst();
       if (company) {
@@ -51,18 +50,17 @@ export async function POST(req: Request) {
     const body = await req.json();
     const current = readFallback();
     
-    // Merge all 5 categories safely
     const updated = {
       general: { ...current.general, ...(body.general || {}) },
       purchases: { ...current.purchases, ...(body.purchases || {}) },
       sales: { ...current.sales, ...(body.sales || {}) },
       inventory: { ...current.inventory, ...(body.inventory || {}) },
       numbering: { ...current.numbering, ...(body.numbering || {}) },
+      appearance: { ...current.appearance, ...(body.appearance || {}) },
     };
 
     writeFallback(updated);
 
-    // Sync the general settings back to the Prisma company table
     try {
       const comp = await prisma.company.findFirst();
       const compData = {
