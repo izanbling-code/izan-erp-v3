@@ -108,8 +108,13 @@ export default function NewPurchaseBillPage() {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (!line.productId) return `Please select a product for item ${i + 1}.`;
+      
+      // Only validate warehouse if the setting is enabled
       if (purchaseConfig.requireWarehouse && !line.warehouseId) return `Please select a warehouse for item ${i + 1}.`;
+      
+      // Only validate batch if the setting is enabled
       if (purchaseConfig.requireBatch && !line.batchNumber.trim()) return `Batch number is required for item ${i + 1}.`;
+      
       const qty = Number(line.quantity);
       const cost = Number(line.unitCost);
       if (!Number.isFinite(qty) || qty <= 0) return `Quantity must be greater than zero for item ${i + 1}.`;
@@ -145,7 +150,8 @@ export default function NewPurchaseBillPage() {
           unitCost: Number(line.unitCost) || 0,
           discount: purchaseConfig.allowDiscounts ? Number(line.discount) || 0 : 0,
           tax: purchaseConfig.allowTax ? Number(line.tax) || 0 : 0,
-          warehouseId: line.warehouseId,
+          // If disabled, silently inject the first available warehouse to satisfy the database
+          warehouseId: purchaseConfig.requireWarehouse ? line.warehouseId : (warehouses[0]?.id || ""),
           description: line.description.trim() || null,
         })),
       };
@@ -165,7 +171,7 @@ export default function NewPurchaseBillPage() {
   }
 
   if (loadingData) return (
-    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-300 flex items-center justify-center font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex items-center justify-center font-sans">
       <div className="text-teal-500 font-medium animate-pulse text-lg">Loading purchase module...</div>
     </div>
   );
@@ -176,7 +182,6 @@ export default function NewPurchaseBillPage() {
       <ERPShell title="New Purchase Bill">
         <div className="max-w-7xl mx-auto p-8 space-y-6 relative z-10">
           
-          {/* Header */}
           <div className="flex justify-between items-center bg-gradient-to-r from-[#004e54]/90 to-[#009b9b]/90 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/10 text-white">
             <div>
               <p className="text-teal-200 text-xs font-bold uppercase tracking-widest">Purchases / Bills / New</p>
@@ -190,7 +195,6 @@ export default function NewPurchaseBillPage() {
 
           {error && <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-500 text-sm font-medium">{error}</div>}
 
-          {/* Bill Details */}
           <section className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 dark:border-white/5 overflow-hidden">
             <div className="p-6 border-b border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-zinc-950/30 flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-teal-500" />
@@ -222,7 +226,6 @@ export default function NewPurchaseBillPage() {
             </div>
           </section>
 
-          {/* Purchase Items */}
           <section className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 dark:border-white/5 overflow-hidden">
             <div className="p-6 border-b border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-zinc-950/30 flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -239,13 +242,15 @@ export default function NewPurchaseBillPage() {
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-zinc-400 font-bold border-b border-slate-200/60 dark:border-white/5 pb-2">
                     <th className="pb-3 px-2">Product</th>
-                    <th className="pb-3 px-2">Batch No.{purchaseConfig.requireBatch ? " *" : ""}</th>
+                    {/* Conditionally render Batch column */}
+                    {purchaseConfig.requireBatch && <th className="pb-3 px-2">Batch No. *</th>}
                     <th className="pb-3 px-2">UOM</th>
                     <th className="pb-3 px-2">Qty</th>
                     <th className="pb-3 px-2">Cost</th>
                     {purchaseConfig.allowDiscounts && <th className="pb-3 px-2">Disc.</th>}
                     {purchaseConfig.allowTax && <th className="pb-3 px-2">Tax</th>}
-                    <th className="pb-3 px-2">Warehouse{purchaseConfig.requireWarehouse ? " *" : ""}</th>
+                    {/* Conditionally render Warehouse column */}
+                    {purchaseConfig.requireWarehouse && <th className="pb-3 px-2">Warehouse *</th>}
                     <th className="pb-3 px-2 text-right">Total ({currency})</th>
                     <th className="pb-3 px-2"></th>
                   </tr>
@@ -267,9 +272,12 @@ export default function NewPurchaseBillPage() {
                           </select>
                         </td>
 
-                        <td className="py-3 px-2">
-                          <input type="text" value={line.batchNumber} onChange={(e) => updateLine(line.id, "batchNumber", e.target.value)} placeholder={purchaseConfig.requireBatch ? "Required" : "Optional"} className="w-[100px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none" />
-                        </td>
+                        {/* Conditionally render Batch input */}
+                        {purchaseConfig.requireBatch && (
+                          <td className="py-3 px-2">
+                            <input type="text" value={line.batchNumber} onChange={(e) => updateLine(line.id, "batchNumber", e.target.value)} placeholder="Required" className="w-[100px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none focus:border-teal-500" />
+                          </td>
+                        )}
 
                         <td className="py-3 px-2">
                           <select value={line.uom} onChange={(e) => updateLine(line.id, "uom", e.target.value as any)} className="w-[90px] bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/30 text-teal-700 dark:text-teal-300 p-2 rounded-lg text-xs font-bold outline-none">
@@ -278,23 +286,26 @@ export default function NewPurchaseBillPage() {
                           </select>
                         </td>
 
-                        <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.quantity} onChange={(e) => updateLine(line.id, "quantity", e.target.value)} className="w-[80px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none text-center" /></td>
-                        <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.unitCost} onChange={(e) => updateLine(line.id, "unitCost", e.target.value)} className="w-[90px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none text-right" /></td>
+                        <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.quantity} onChange={(e) => updateLine(line.id, "quantity", e.target.value)} className="w-[80px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none text-center focus:border-teal-500" /></td>
+                        <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.unitCost} onChange={(e) => updateLine(line.id, "unitCost", e.target.value)} className="w-[90px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none text-right focus:border-teal-500" /></td>
                         
                         {purchaseConfig.allowDiscounts && (
-                          <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.discount} onChange={(e) => updateLine(line.id, "discount", e.target.value)} className="w-[80px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none text-right" /></td>
+                          <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.discount} onChange={(e) => updateLine(line.id, "discount", e.target.value)} className="w-[80px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none text-right focus:border-teal-500" /></td>
                         )}
 
                         {purchaseConfig.allowTax && (
-                          <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.tax} onChange={(e) => updateLine(line.id, "tax", e.target.value)} className="w-[80px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none text-right" /></td>
+                          <td className="py-3 px-2"><input type="number" min="0" step="0.01" value={line.tax} onChange={(e) => updateLine(line.id, "tax", e.target.value)} className="w-[80px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none text-right focus:border-teal-500" /></td>
                         )}
 
-                        <td className="py-3 px-2">
-                          <select value={line.warehouseId} onChange={(e) => updateLine(line.id, "warehouseId", e.target.value)} className="w-[130px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none">
-                            <option value="">Select warehouse...</option>
-                            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                          </select>
-                        </td>
+                        {/* Conditionally render Warehouse input */}
+                        {purchaseConfig.requireWarehouse && (
+                          <td className="py-3 px-2">
+                            <select value={line.warehouseId} onChange={(e) => updateLine(line.id, "warehouseId", e.target.value)} className="w-[130px] bg-white dark:bg-zinc-950/50 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white p-2 rounded-lg text-xs outline-none focus:border-teal-500">
+                              <option value="">Select warehouse...</option>
+                              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            </select>
+                          </td>
+                        )}
 
                         <td className="py-3 px-2 text-right text-teal-600 dark:text-teal-400 font-bold">{formatAmount(lineTotal)}</td>
                         
@@ -311,7 +322,6 @@ export default function NewPurchaseBillPage() {
             </div>
           </section>
 
-          {/* Totals Section */}
           <section className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 dark:border-white/5 overflow-hidden">
             <div className="p-6 border-b border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-zinc-950/30 flex items-center gap-2">
               <Calculator className="w-4 h-4 text-teal-500" />
@@ -358,7 +368,6 @@ export default function NewPurchaseBillPage() {
             </div>
           </section>
 
-          {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" disabled={saving} onClick={() => router.push("/purchases/bills")} className="px-6 py-2.5 text-sm font-semibold text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors">Cancel</button>
             <button type="button" disabled={saving} onClick={() => saveBill("DRAFT")} className="px-6 py-2.5 text-sm font-semibold text-teal-600 dark:text-teal-300 bg-teal-50 dark:bg-white/5 border border-teal-200 dark:border-white/10 rounded-xl transition-all">Save Draft</button>
