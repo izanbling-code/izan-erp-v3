@@ -8,7 +8,7 @@ export async function GET() {
       where: {
        isActive: true,
        type: { in: ["PRODUCT","SERVICE","GOODS"] } // <-- To this
-       }
+       },
       select: {
         id: true,
         name: true,
