@@ -102,7 +102,7 @@ export default function ShopNavbar() {
               <div className="space-y-6">
                 {cart.map((item, i) => (
                   <div key={i} className="flex gap-4 border-b pb-4">
-                    <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover rounded" />
+                    <img src={item.imageUrl || "https://placehold.co/100x100?text=No+Image"} alt={item.name} className="w-16 h-16 object-cover rounded" />
                     <div className="flex-grow">
                       <h4 className="text-sm font-medium">{item.name}</h4>
                       <p className="text-xs text-gray-500 mt-1">Rs. {Number(item.salePrice).toLocaleString()}</p>

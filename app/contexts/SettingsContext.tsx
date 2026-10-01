@@ -1,94 +1,90 @@
 ﻿"use client";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "@/app/lib/supabase";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { ERPSystemSettings, DEFAULT_ERP_SETTINGS } from "@/app/types/erp-settings";
-
-type SettingsContextType = {
-  settings: ERPSystemSettings;
-  loading: boolean;
-  updateCategory: (category: keyof ERPSystemSettings, values: any) => Promise<void>;
-  formatAmount: (amount: number) => string;
-  formatDate: (dateStr: string) => string;
-  currency: string;
-};
-
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+const SettingsContext = createContext<any>(null);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [settings, setSettings] = useState<ERPSystemSettings>(DEFAULT_ERP_SETTINGS);
+  const [settings, setSettings] = useState<any>({
+    general: { currency: "PKR", companyName: "" },
+    sales: {},
+    accounting: {},
+    appearance: { theme: "dark" },
+    purchases: {},
+    inventory: {},
+    numbering: {}
+  });
   const [loading, setLoading] = useState(true);
 
+  // 1. Fetch settings directly from Supabase on load
   useEffect(() => {
-    fetch("/api/settings")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.ok && data.settings) {
-          setSettings(data.settings);
+    async function loadSettings() {
+      try {
+        const { data, error } = await supabase
+          .from("company_settings")
+          .select("*")
+          .eq("company_id", "default_company")
+          .maybeSingle();
+
+        if (error) {
+          console.error("Supabase load error:", error.message);
+        } else if (data) {
+          setSettings((prev: any) => ({
+            ...prev,
+            general: data.general || prev.general,
+            sales: data.sales || {},
+            accounting: data.accounting || {},
+            appearance: data.appearance || prev.appearance,
+            purchases: data.purchases || {},
+            inventory: data.inventory || {},
+            numbering: data.numbering || {}
+          }));
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      } catch (err) {
+        console.error("Failed to connect to Supabase:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadSettings();
   }, []);
 
-  const updateCategory = async (category: keyof ERPSystemSettings, values: any) => {
-    const updated = {
-      ...settings,
-      [category]: { ...settings[category], ...values },
-    };
-    setSettings(updated);
-    await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated),
-    });
-  };
+  // 2. Direct Supabase save — no API routes or remapping needed
+  const updateCategory = async (category: string, data: any) => {
+    // Immediate UI update
+    const updatedCategory = { ...(settings[category] || {}), ...data };
+    setSettings((prev: any) => ({
+      ...prev,
+      [category]: updatedCategory
+    }));
 
-  const formatAmount = (amount: number) => {
-    const decimals = settings.general?.decimalPlaces ?? 2;
-    return (Number(amount) || 0).toLocaleString("en-PK", {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
-  };
+    // Direct update to Supabase
+    const { error } = await supabase
+      .from("company_settings")
+      .update({ [category]: updatedCategory })
+      .eq("company_id", "default_company");
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-
-    switch (settings.general?.dateFormat) {
-      case "MM/DD/YYYY": return `${month}/${day}/${year}`;
-      case "YYYY-MM-DD": return `${year}-${month}-${day}`;
-      default: return `${day}/${month}/${year}`;
+    if (error) {
+      console.error("Supabase update error:", error.message);
+      throw new Error(error.message);
     }
   };
 
+  const formatAmount = (num: number) =>
+    Number(num || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const currency = settings.general?.currency || "PKR";
+
   return (
-    <SettingsContext.Provider
-      value={{
-        settings,
-        loading,
-        updateCategory,
-        formatAmount,
-        formatDate,
-        currency: settings.general?.currency || "PKR",
-      }}
-    >
+    <SettingsContext.Provider value={{ settings, updateCategory, loading, formatAmount, currency }}>
       {children}
     </SettingsContext.Provider>
   );
 }
 
-export function useERPConfig<T extends keyof ERPSystemSettings>(category?: T) {
-  const context = useContext(SettingsContext);
-  if (!context) {
-    throw new Error("useERPConfig must be used within SettingsProvider");
-  }
-  return {
-    ...context,
-    config: category ? context.settings[category] : context.settings,
-  };
+export function useERPConfig(category?: string) {
+  const ctx = useContext(SettingsContext);
+  if (!ctx) throw new Error("useERPConfig must be used within a SettingsProvider");
+  if (category) return { ...ctx, config: ctx.settings[category] || {} };
+  return ctx;
 }

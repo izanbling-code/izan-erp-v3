@@ -29,7 +29,18 @@ export async function POST(req: Request) {
 
     // 2. Generate Order Number
     const orderCount = await prisma.order.count({ where: { companyId: company.id } });
-    const orderNumber = `ORD-${String(orderCount + 1).padStart(5, '0')}`;
+    const lastOrder = await prisma.order.findFirst({
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    let nextNumber = 1;
+    if (lastOrder && lastOrder.orderNumber) {
+      const match = lastOrder.orderNumber.replace(/\D/g, '');
+      if (match) {
+        nextNumber = parseInt(match, 10) + 1;
+      }
+    }
+    const orderNumber = `ORD-${String(nextNumber).padStart(4, '0')}`;
 
     // 3. Create the Order (Using your strict schema enums)
     const order = await prisma.order.create({

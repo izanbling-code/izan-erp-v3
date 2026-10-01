@@ -1,88 +1,60 @@
-﻿import { NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
-import { DEFAULT_ERP_SETTINGS } from "@/app/types/erp-settings";
-import fs from "fs";
-import path from "path";
+import { authenticate } from "@/app/lib/auth";
 
-const FALLBACK_FILE = path.join(process.cwd(), "settings-data.json");
-
-function readFallback() {
+export async function GET(req: NextRequest) {
   try {
-    if (fs.existsSync(FALLBACK_FILE)) {
-      return JSON.parse(fs.readFileSync(FALLBACK_FILE, "utf8"));
+    const company = await prisma.company.findFirst();
+    if (!company) {
+      return NextResponse.json({ ok: true, settings: {} });
     }
-  } catch (e) {}
-  return DEFAULT_ERP_SETTINGS;
-}
 
-function writeFallback(data: any) {
-  try {
-    fs.writeFileSync(FALLBACK_FILE, JSON.stringify(data, null, 2), "utf8");
-  } catch (e) {}
-}
+    const settings = await prisma.companySettings.findUnique({
+      where: { companyId: company.id }
+    });
 
-export async function GET() {
-  try {
-    let settings = readFallback();
-    
-    try {
-      const company = await prisma.company.findFirst();
-      if (company) {
-        settings.general.companyName = company.name || settings.general.companyName;
-        settings.general.legalName = company.legalName || settings.general.legalName;
-        settings.general.ntn = company.ntn || settings.general.ntn;
-        settings.general.email = company.email || settings.general.email;
-        settings.general.phone = company.phone || settings.general.phone;
-        settings.general.address = company.address || settings.general.address;
-        settings.general.country = company.country || settings.general.country;
-        settings.general.currency = company.currency || settings.general.currency;
-      }
-    } catch (e) {}
-
-    return NextResponse.json({ ok: true, settings });
-  } catch (error) {
-    return NextResponse.json({ ok: true, settings: DEFAULT_ERP_SETTINGS });
+    return NextResponse.json({ 
+      ok: true, 
+      settings: settings || {} 
+    });
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+export async function PUT(req: NextRequest) {
   try {
+    const user = await authenticate(req);
+    if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
     const body = await req.json();
-    const current = readFallback();
-    
-    const updated = {
-      general: { ...current.general, ...(body.general || {}) },
-      purchases: { ...current.purchases, ...(body.purchases || {}) },
-      sales: { ...current.sales, ...(body.sales || {}) },
-      inventory: { ...current.inventory, ...(body.inventory || {}) },
-      numbering: { ...current.numbering, ...(body.numbering || {}) },
-      appearance: { ...current.appearance, ...(body.appearance || {}) },
-    };
+    const { category, data } = body;
 
-    writeFallback(updated);
+    if (!category || !data) {
+      return NextResponse.json({ ok: false, error: "Category and data are required" }, { status: 400 });
+    }
 
-    try {
-      const comp = await prisma.company.findFirst();
-      const compData = {
-        name: updated.general.companyName,
-        legalName: updated.general.legalName,
-        ntn: updated.general.ntn,
-        email: updated.general.email,
-        phone: updated.general.phone,
-        address: updated.general.address,
-        country: updated.general.country,
-        currency: updated.general.currency,
-      };
-      
-      if (comp) {
-        await prisma.company.update({ where: { id: comp.id }, data: compData });
-      } else {
-        await prisma.company.create({ data: compData });
-      }
-    } catch (e) {}
+    const company = await prisma.company.findFirst();
+    if (!company) return NextResponse.json({ ok: false, error: "Company not found" }, { status: 404 });
 
-    return NextResponse.json({ ok: true, settings: updated });
-  } catch (error) {
-    return NextResponse.json({ ok: false, error: "Failed to save settings" }, { status: 500 });
+    let currentSettings = await prisma.companySettings.findUnique({ where: { companyId: company.id } });
+    if (!currentSettings) {
+      currentSettings = await prisma.companySettings.create({ 
+        data: { companyId: company.id, general: {}, appearance: {}, sales: {}, purchases: {}, inventory: {}, numbering: {}, accounting: {} } 
+      });
+    }
+
+    // Perform a deep merge to ensure new fields like courierDepositAccount are saved properly
+    const existingCategoryData = (currentSettings as any)[category] || {};
+    const mergedData = { ...existingCategoryData, ...data };
+
+    await prisma.companySettings.update({
+      where: { companyId: company.id },
+      data: { [category]: mergedData }
+    });
+
+    return NextResponse.json({ ok: true, message: "Settings updated successfully" });
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }

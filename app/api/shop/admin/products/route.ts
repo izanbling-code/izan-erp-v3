@@ -3,7 +3,7 @@ import { prisma } from "@/app/lib/prisma";
 
 export async function GET() {
   try {
-    const products = await prisma.product.findMany({ where: { type: "GOODS" }, orderBy: { createdAt: 'desc' } });
+    const products = await prisma.product.findMany({ where: { type: { in: ["PRODUCT", "GOODS"] } }, orderBy: { createdAt: 'desc' } });
     return NextResponse.json(products);
   } catch (error) {
     return NextResponse.json([], { status: 500 });
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
         salePrice: Number(body.price),
         imageUrl: body.imageUrl,
         description: body.description,
-        type: "GOODS",
+        type: { in: ["PRODUCT", "GOODS"] },
         isActive: true
       }
     });

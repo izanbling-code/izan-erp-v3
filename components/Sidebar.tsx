@@ -9,7 +9,8 @@ import {
   Package, Layers, ArrowRightLeft,
   BookOpen, Landmark, BookMarked, Wallet,
   BarChart3, Calendar, Settings, Shield, Server,
-  LogOut
+  LogOut,
+  RefreshCw
 } from "lucide-react";
 
 const menuGroups = [
@@ -30,12 +31,13 @@ const menuGroups = [
     ]
   },
   {
-    label: "Purchases",
-    items: [
-      { name: "Purchase Bills", href: "/purchases/bills", icon: ShoppingBag },
-      { name: "Suppliers", href: "/purchases/suppliers", icon: Truck },
-      { name: "Payables", href: "/purchases/payables", icon: Receipt },
-    ]
+      label: "PURCHASES",
+      items: [
+        { name: "Purchase Bills", href: "/purchases/bills", icon: ShoppingBag },
+        { name: "Returns & Transfer Out", href: "/purchases/returns", icon: RefreshCw },
+        { name: "Suppliers", href: "/purchases/suppliers", icon: Truck },
+        { name: "Payables Ledger", href: "/purchases/payables", icon: FileText },
+      ]
   },
   {
     label: "Inventory",

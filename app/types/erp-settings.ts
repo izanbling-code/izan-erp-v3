@@ -28,6 +28,13 @@ export interface SalesSettings {
   requireCustomer: boolean;
   requireWarehouse: boolean;
   requireBatchSelection: boolean;
+  defaultCourier: string;
+  defaultPaymentStatus: string;
+  // Courier Accounting Modules
+  courierPayableAccount?: string;
+  courierCollectionAccount?: string;
+  deliveryIncomeAccount?: string;
+  deliveryExpenseAccount?: string;
 }
 
 export interface InventorySettings {
@@ -52,6 +59,15 @@ export interface AppearanceSettings {
   invoiceTemplate: "modern" | "classic" | "thermal";
   receiptTemplate: "standard" | "minimalist" | "thermal";
   showLogoOnPrints: boolean;
+  invoiceFooterNote: string;
+  paymentInstructions: string;
+  dashboard: {
+    showKpis: boolean;
+    showSalesChart: boolean;
+    showStockChart: boolean;
+    showActivity: boolean;
+    showCategories: boolean;
+  };
 }
 
 export interface ERPSystemSettings {
@@ -92,6 +108,8 @@ export const DEFAULT_ERP_SETTINGS: ERPSystemSettings = {
     requireCustomer: true,
     requireWarehouse: true,
     requireBatchSelection: true,
+    defaultCourier: "TCS",
+    defaultPaymentStatus: "PENDING",
   },
   inventory: {
     allowNegativeStock: false,
@@ -113,5 +131,15 @@ export const DEFAULT_ERP_SETTINGS: ERPSystemSettings = {
     invoiceTemplate: "modern",
     receiptTemplate: "standard",
     showLogoOnPrints: true,
+    invoiceFooterNote: "Thank you for your business!",
+    paymentInstructions: "",
+    dashboard: {
+      showKpis: true,
+      showSalesChart: true,
+      showStockChart: true,
+      showActivity: true,
+      showCategories: true,
+    }
   },
 };
+

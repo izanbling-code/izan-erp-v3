@@ -62,7 +62,7 @@ export default async function ProductPage({ params }: { params: any }) {
             </p>
           </div>
           
-          <AddToCartButton product={product} />
+          <AddToCartButton product={{ ...product, costPrice: Number(product.costPrice || 0), salePrice: Number(product.salePrice || 0), salesPrice: Number(product.salesPrice || 0), reorderLevel: Number(product.reorderLevel || 0) }} />
         </div>
       </main>
     </div>

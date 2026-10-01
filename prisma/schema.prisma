@@ -70,6 +70,7 @@ enum MovementType {
 }
 
 model Company {
+  couriers Courier[]
   id        String   @id @default(cuid())
   name      String   @default("Izan Bling")
   legalName String?
@@ -476,6 +477,8 @@ model Supplier {
 }
 
 model SalesInvoice {
+  courierId String?
+  courierData Courier? @relation(fields: [courierId], references: [id])
   id              String        @id @default(cuid())
   companyId       String
   customerId      String
@@ -1020,4 +1023,19 @@ model OrderLine {
 
   @@index([companyId])
   @@index([orderId])
+}
+
+model Courier {
+ id String @id @default(cuid())
+ name String
+ contactName String?
+ phone String?
+ trackingUrl String?
+ isActive Boolean @default(true)
+ companyId String
+ company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+ invoices SalesInvoice[]
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@index([companyId])
 }

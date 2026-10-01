@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
           const sku = `SKU-${Date.now().toString().slice(-5)}-${Math.floor(Math.random() * 100)}`;
           const cost = Number(line.unitCost) || 0;
           const newProduct = await tx.product.create({
-            data: { companyId: company.id, name: line.name.trim(), categoryId: finalCatId || null, brandId: finalBrandId || null, unitId: finalUnitId || null, type: "GOODS", costPrice: cost, salePrice: cost > 0 ? cost * 1.5 : 0, sku }
+            data: { companyId: company.id, name: line.name.trim(), categoryId: finalCatId || null, brandId: finalBrandId || null, unitId: finalUnitId || null, type: { in: ["PRODUCT", "GOODS"] }, costPrice: cost, salePrice: cost > 0 ? cost * 1.5 : 0, sku }
           });
           finalProductId = newProduct.id;
         }

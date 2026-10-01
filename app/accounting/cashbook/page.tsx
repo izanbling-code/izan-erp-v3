@@ -1,7 +1,22 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
+import { Toaster, toast } from "react-hot-toast";
 import ERPShell from "@/app/components/erp-shell";
+import { useERPConfig } from "@/app/contexts/SettingsContext";
+import {
+  Wallet,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowLeftRight,
+  RefreshCw,
+  Calendar,
+  BookOpen,
+  TrendingUp,
+  TrendingDown,
+  Scale,
+  X,
+} from "lucide-react";
 
 type Account = {
   id: string;
@@ -23,16 +38,19 @@ type CashRow = {
 type VoucherType = "CRV" | "CPV" | "CTV";
 
 export default function CashBookPage() {
+  const { settings, formatAmount, currency } = useERPConfig();
+  const isCompact = settings?.appearance?.dataDensity === "compact";
+
   const [cashAccounts, setCashAccounts] = useState<Account[]>([]);
   const [allAccounts, setAllAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  
+
   const [rows, setRows] = useState<CashRow[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
   const [closingBalance, setClosingBalance] = useState(0);
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -45,19 +63,19 @@ export default function CashBookPage() {
     amount: "",
     date: new Date().toISOString().split("T")[0],
     reference: "",
-    description: ""
+    description: "",
   });
 
   async function loadData() {
     try {
       setLoading(true);
       setError("");
-      
+
       // Load All Accounts for the Offset Dropdown
       const accRes = await fetch("/api/accounts", { cache: "no-store" });
       const accJson = await accRes.json();
       if (accJson.ok) {
-        setAllAccounts(accJson.accounts.filter((a: any) => a.isActive));
+        setAllAccounts((accJson.accounts || []).filter((a: any) => a.isActive));
       }
 
       // Load Cash Book Ledger
@@ -68,27 +86,37 @@ export default function CashBookPage() {
 
       const res = await fetch(`/api/banking/cashbook?${query.toString()}`, { cache: "no-store" });
       const json = await res.json();
-      
+
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to load Cash Book");
-      
-            // STRICT CASH BOOK ARCHITECTURE: Block digital banks from Cash Book
+
+      // STRICT CASH BOOK ARCHITECTURE: Block digital banks from Cash Book
       const strictCashAccounts = (json.accounts || []).filter((acc: any) => {
         const name = acc.name.toLowerCase();
-        return name.includes("cash") && !name.includes("bank") && !name.includes("easypaisa") && !name.includes("meezan");
+        return (
+          name.includes("cash") &&
+          !name.includes("bank") &&
+          !name.includes("easypaisa") &&
+          !name.includes("meezan")
+        );
       });
       setCashAccounts(strictCashAccounts);
-      
+
       if (!selectedAccountId && strictCashAccounts.length > 0) {
         setSelectedAccountId(strictCashAccounts[0].id);
-      } else if (json.selectedAccountId && strictCashAccounts.some((a: any) => a.id === json.selectedAccountId)) {
+      } else if (
+        json.selectedAccountId &&
+        strictCashAccounts.some((a: any) => a.id === json.selectedAccountId)
+      ) {
         setSelectedAccountId(json.selectedAccountId);
       }
-      setRows(json.rows || []);
-      setOpeningBalance(json.openingBalance || 0);
-      setClosingBalance(json.closingBalance || 0);
 
+      setRows(json.rows || []);
+      setOpeningBalance(Number(json.openingBalance || 0));
+      setClosingBalance(Number(json.closingBalance || 0));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load Cash Book");
+      const msg = err instanceof Error ? err.message : "Failed to load Cash Book";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -97,18 +125,14 @@ export default function CashBookPage() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountId, fromDate, toDate]); // Auto-reload when filters change
+  }, [selectedAccountId, fromDate, toDate]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 2 }).format(amount);
-  };
-
-  const totalIn = rows.reduce((sum, row) => sum + row.moneyIn, 0);
-  const totalOut = rows.reduce((sum, row) => sum + row.moneyOut, 0);
+  const totalIn = rows.reduce((sum, row) => sum + Number(row.moneyIn || 0), 0);
+  const totalOut = rows.reduce((sum, row) => sum + Number(row.moneyOut || 0), 0);
 
   function openVoucherModal(type: VoucherType) {
     if (!selectedAccountId) {
-      alert("Please select a Cash/Bank account first.");
+      toast.error("Please select an active Cash account first.");
       return;
     }
     setVoucherType(type);
@@ -117,15 +141,18 @@ export default function CashBookPage() {
       amount: "",
       date: new Date().toISOString().split("T")[0],
       reference: "",
-      description: ""
+      description: "",
     });
     setShowModal(true);
   }
 
   async function handleVoucherSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!vForm.offsetAccountId) return alert("Please select an offsetting account.");
-    
+    if (!vForm.offsetAccountId) {
+      toast.error("Please select an offsetting account.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       const payload = {
@@ -135,191 +162,451 @@ export default function CashBookPage() {
         amount: Number(vForm.amount),
         date: vForm.date,
         reference: vForm.reference,
-        description: vForm.description
+        description: vForm.description,
       };
 
       const res = await fetch("/api/banking/cashbook/vouchers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
 
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to post voucher.");
 
+      toast.success(`${voucherType} posted to General Ledger!`);
       setShowModal(false);
-      loadData(); // Instantly refresh ledger
+      loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "An error occurred.");
+      toast.error(err instanceof Error ? err.message : "An error occurred.");
     } finally {
       setSubmitting(false);
     }
   }
 
-  const offsetLabel = voucherType === "CRV" ? "Receive From (Customer / Revenue)" : voucherType === "CPV" ? "Pay To (Vendor / Expense)" : "Transfer Account (Bank / Cash)";
-  const modalTitle = voucherType === "CRV" ? "Cash Receipt Voucher (CRV)" : voucherType === "CPV" ? "Cash Payment Voucher (CPV)" : "Contra Transfer Voucher (CTV)";
+  const offsetLabel =
+    voucherType === "CRV"
+      ? "Receive From (Customer / Revenue)"
+      : voucherType === "CPV"
+      ? "Pay To (Vendor / Expense)"
+      : "Transfer Account (Bank / Cash)";
+
+  const modalTitle =
+    voucherType === "CRV"
+      ? "Cash Receipt Voucher (CRV)"
+      : voucherType === "CPV"
+      ? "Cash Payment Voucher (CPV)"
+      : "Contra Transfer Voucher (CTV)";
+
+  const cellPad = isCompact ? "py-2.5 px-4" : "py-3.5 px-5";
 
   return (
-    <ERPShell title="Cash Book & Banking">
-      <div className="max-w-6xl mx-auto p-6 space-y-6 text-sm">
-        
-        {/* Header & Actions */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Cash Book & Banking Ledger</h1>
-            <p className="text-gray-500 mt-1">Manage operational cash flows and generate standard vouchers.</p>
-          </div>
-          
-          <div className="flex gap-2">
-            <button data-shortcut="r" onClick={() => openVoucherModal("CRV")} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition text-xs shadow-sm">
-              + Receive Cash
-            </button>
-            <button data-shortcut="p" onClick={() => openVoucherModal("CPV")} className="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-4 rounded-lg transition text-xs shadow-sm">
-              - Pay Cash
-            </button>
-            <button data-shortcut="t" onClick={() => openVoucherModal("CTV")} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition text-xs shadow-sm">
-              â‡„ Transfer
-            </button>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap items-end gap-4">
-          <label className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-            <span className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Active Book</span>
-            <select 
-              value={selectedAccountId} 
-              onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="border border-gray-300 rounded-lg p-2.5 bg-white shadow-sm outline-none focus:border-gray-900 font-medium"
-            >
-              {cashAccounts.map(acc => (
-                <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="font-semibold text-gray-700 text-xs uppercase tracking-wider">From</span>
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="border border-gray-300 rounded-lg p-2.5 bg-white shadow-sm outline-none focus:border-gray-900" />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="font-semibold text-gray-700 text-xs uppercase tracking-wider">To</span>
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="border border-gray-300 rounded-lg p-2.5 bg-white shadow-sm outline-none focus:border-gray-900" />
-          </label>
-        </div>
-
-        {error && <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg font-medium">{error}</div>}
-
-        {/* Financial Summaries */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <div className="text-gray-500 font-semibold text-xs uppercase tracking-wider mb-1">Opening Balance</div>
-            <div className="text-2xl font-bold text-gray-900">{formatCurrency(openingBalance)}</div>
-          </div>
-          <div className="bg-emerald-50 p-5 rounded-xl shadow-sm border border-emerald-100">
-            <div className="text-emerald-700 font-semibold text-xs uppercase tracking-wider mb-1">Total Money In</div>
-            <div className="text-2xl font-bold text-emerald-900">{formatCurrency(totalIn)}</div>
-          </div>
-          <div className="bg-rose-50 p-5 rounded-xl shadow-sm border border-rose-100">
-            <div className="text-rose-700 font-semibold text-xs uppercase tracking-wider mb-1">Total Money Out</div>
-            <div className="text-2xl font-bold text-rose-900">{formatCurrency(totalOut)}</div>
-          </div>
-          <div className="bg-gray-900 p-5 rounded-xl shadow-sm border border-gray-800">
-            <div className="text-gray-400 font-semibold text-xs uppercase tracking-wider mb-1">Active Closing Balance</div>
-            <div className="text-2xl font-bold text-white">{formatCurrency(closingBalance)}</div>
-          </div>
-        </div>
-
-        {/* Ledger Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <table className="erp-data-table">
-            <thead>
-              <tr className="border-b bg-gray-50 text-[11px] uppercase text-gray-500 font-bold">
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Voucher / Ref</th>
-                <th className="py-3 px-4 w-1/3">Description</th>
-                <th className="py-3 px-4 text-right text-emerald-700">Money In (Dr)</th>
-                <th className="py-3 px-4 text-right text-rose-700">Money Out (Cr)</th>
-                <th className="py-3 px-4 text-right text-gray-900">Running Balance</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 font-medium text-[13px]">
-              {loading && rows.length === 0 ? (
-                <tr><td colSpan={6} className="py-12 text-center text-gray-400 font-semibold">Loading ledger...</td></tr>
-              ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="py-12 text-center text-gray-400">No transactions found for this period.</td></tr>
-              ) : (
-                rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50/50 transition">
-                    <td className="py-3 px-4 text-gray-600">{row.date}</td>
-                    <td className="py-3 px-4 text-gray-900 font-bold tracking-tight">{row.reference}</td>
-                    <td className="py-3 px-4 text-gray-700">{row.description}</td>
-                    <td className="py-3 px-4 text-right text-emerald-600 font-semibold">{row.moneyIn > 0 ? formatCurrency(row.moneyIn) : "â€”"}</td>
-                    <td className="py-3 px-4 text-right text-rose-600 font-semibold">{row.moneyOut > 0 ? formatCurrency(row.moneyOut) : "â€”"}</td>
-                    <td className="py-3 px-4 text-right text-gray-900 font-bold">{formatCurrency(row.balance)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* VOUCHER ENTRY MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className={`p-5 text-white ${voucherType === "CRV" ? "bg-emerald-600" : voucherType === "CPV" ? "bg-rose-600" : "bg-indigo-600"} flex justify-between items-center`}>
-              <div>
-                <h2 className="text-lg font-bold">{modalTitle}</h2>
-                <p className="text-white/80 text-xs mt-0.5">Post an active transaction to the general ledger.</p>
-              </div>
-              <button onClick={() => setShowModal(false)} className="text-white/70 hover:text-white text-2xl font-bold">&times;</button>
+    <>
+      <Toaster position="top-right" />
+      <ERPShell title="Cash Book">
+        <div className="space-y-6 relative z-10">
+          {/* Top Header & Voucher Actions */}
+          <div className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 dark:border-white/5 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Physical Cash Book &amp; Voucher Register
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                Manage operational cash flows, daily petty cash, and post standard CRV, CPV, and Contra vouchers.
+              </p>
             </div>
-            
-            <form onSubmit={handleVoucherSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1.5">
-                  <span className="font-semibold text-gray-700 text-xs">Date *</span>
-                  <input required type="date" value={vForm.date} onChange={(e) => setVForm({...vForm, date: e.target.value})} className="border rounded-md p-2.5 bg-gray-50 outline-none focus:border-gray-900 text-sm" />
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                data-shortcut="r"
+                onClick={() => openVoucherModal("CRV")}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all"
+              >
+                <ArrowDownLeft className="w-4 h-4" /> Receive Cash (CRV)
+              </button>
+
+              <button
+                type="button"
+                data-shortcut="p"
+                onClick={() => openVoucherModal("CPV")}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-rose-500/20 transition-all"
+              >
+                <ArrowUpRight className="w-4 h-4" /> Pay Cash (CPV)
+              </button>
+
+              <button
+                type="button"
+                data-shortcut="t"
+                onClick={() => openVoucherModal("CTV")}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-900/80 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-zinc-200 text-xs font-bold flex items-center gap-1.5 transition-all"
+              >
+                <ArrowLeftRight className="w-4 h-4 text-teal-600 dark:text-teal-400" /> Transfer (CTV)
+              </button>
+            </div>
+          </div>
+
+          {/* Financial KPI Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 dark:border-white/5 p-5 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
+                  Opening Balance
+                </span>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">
+                  {currency} {formatAmount(openingBalance)}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-zinc-400">
+                <Scale className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 dark:border-white/5 p-5 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                  Total Money In (Dr)
+                </span>
+                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">
+                  {currency} {formatAmount(totalIn)}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 dark:border-white/5 p-5 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">
+                  Total Money Out (Cr)
+                </span>
+                <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1.5">
+                  {currency} {formatAmount(totalOut)}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                <TrendingDown className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-teal-200/80 dark:border-teal-500/20 p-5 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">
+                  Active Closing Balance
+                </span>
+                <p className="text-2xl font-bold text-teal-600 dark:text-teal-400 mt-1.5">
+                  {currency} {formatAmount(closingBalance)}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400">
+                <Wallet className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Filter & Cash Ledger Table Card */}
+          <div className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 dark:border-white/5 overflow-hidden">
+            {/* Filters Toolbar */}
+            <div className="p-5 border-b border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-zinc-950/30 flex flex-wrap items-end gap-4">
+              <div className="flex-1 min-w-[240px]">
+                <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block mb-1.5">
+                  Active Cash Book
                 </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="font-semibold text-gray-700 text-xs">Amount (PKR) *</span>
-                  <input required type="number" min="0.01" step="0.01" placeholder="0.00" value={vForm.amount} onChange={(e) => setVForm({...vForm, amount: e.target.value})} className="border rounded-md p-2.5 bg-gray-50 outline-none focus:border-gray-900 text-sm font-bold" />
-                </label>
+                <div className="relative">
+                  <BookOpen className="w-4 h-4 text-teal-600 dark:text-teal-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <select
+                    value={selectedAccountId}
+                    onChange={(e) => setSelectedAccountId(e.target.value)}
+                    className="w-full bg-white dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm font-semibold outline-none focus:border-teal-500 cursor-pointer"
+                  >
+                    {cashAccounts.length === 0 ? (
+                      <option value="">No Cash Account Found</option>
+                    ) : (
+                      cashAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.code} — {acc.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
               </div>
 
-              <label className="flex flex-col gap-1.5">
-                <span className="font-semibold text-gray-700 text-xs">{offsetLabel} *</span>
-                <select required value={vForm.offsetAccountId} onChange={(e) => setVForm({...vForm, offsetAccountId: e.target.value})} className="border rounded-md p-2.5 bg-gray-50 outline-none focus:border-gray-900 text-sm">
-                  <option value="">-- Select Account --</option>
-                  {allAccounts.map(acc => (
-                    <option key={acc.id} value={acc.id} disabled={acc.id === selectedAccountId}>
-                      {acc.code} - {acc.name} ({acc.type})
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block mb-1.5">
+                  From Date
+                </label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="bg-white dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
 
-              <label className="flex flex-col gap-1.5">
-                <span className="font-semibold text-gray-700 text-xs">Invoice / Reference #</span>
-                <input type="text" placeholder="e.g. INV-2026-001" value={vForm.reference} onChange={(e) => setVForm({...vForm, reference: e.target.value})} className="border rounded-md p-2.5 bg-gray-50 outline-none focus:border-gray-900 text-sm" />
-              </label>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block mb-1.5">
+                  To Date
+                </label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="bg-white dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
 
-              <label className="flex flex-col gap-1.5">
-                <span className="font-semibold text-gray-700 text-xs">Description *</span>
-                <textarea required rows={2} placeholder="Reason for transaction..." value={vForm.description} onChange={(e) => setVForm({...vForm, description: e.target.value})} className="border rounded-md p-2.5 bg-gray-50 outline-none focus:border-gray-900 text-sm resize-none" />
-              </label>
+              {(fromDate || toDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFromDate("");
+                    setToDate("");
+                  }}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-600 dark:text-zinc-400 text-xs font-bold transition-all"
+                >
+                  Clear Dates
+                </button>
+              )}
 
-              <div className="pt-4 flex justify-end gap-3 border-t mt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-lg font-semibold text-gray-600 hover:bg-gray-50 text-sm">Cancel</button>
-                <button type="submit" disabled={submitting} className={`px-5 py-2 rounded-lg font-bold text-white text-sm ${voucherType === "CRV" ? "bg-emerald-600 hover:bg-emerald-700" : voucherType === "CPV" ? "bg-rose-600 hover:bg-rose-700" : "bg-indigo-600 hover:bg-indigo-700"} disabled:opacity-50`}>
-                  {submitting ? "Posting..." : "Post Voucher"}
+              <button
+                type="button"
+                onClick={loadData}
+                disabled={loading}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-zinc-300 text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-teal-500" : ""}`} /> Refresh
+              </button>
+            </div>
+
+            {error && (
+              <div className="mx-5 mt-4 p-3.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-400 text-xs font-bold">
+                {error}
+              </div>
+            )}
+
+            {/* Ledger Data Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200/80 dark:border-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-950/50">
+                    <th className={cellPad}>Date</th>
+                    <th className={cellPad}>Voucher / Ref</th>
+                    <th className={`${cellPad} w-1/3`}>Description</th>
+                    <th className={`${cellPad} text-right text-emerald-600 dark:text-emerald-400`}>
+                      Money In (Dr)
+                    </th>
+                    <th className={`${cellPad} text-right text-rose-600 dark:text-rose-400`}>
+                      Money Out (Cr)
+                    </th>
+                    <th className={`${cellPad} text-right`}>Running Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                  {loading && rows.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-16 text-center text-sm text-slate-400 dark:text-zinc-500 animate-pulse font-medium"
+                      >
+                        Loading cash book ledger...
+                      </td>
+                    </tr>
+                  ) : rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-16 text-center space-y-1">
+                        <p className="text-sm font-bold text-slate-700 dark:text-zinc-300">
+                          No cash transactions found
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-zinc-500">
+                          Use Receive Cash (CRV), Pay Cash (CPV), or Transfer (CTV) above to record entries.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors"
+                      >
+                        <td className={`${cellPad} text-slate-600 dark:text-zinc-300 whitespace-nowrap`}>
+                          {row.date}
+                        </td>
+                        <td className={`${cellPad} font-mono text-xs font-bold text-slate-900 dark:text-white whitespace-nowrap`}>
+                          {row.reference || "—"}
+                        </td>
+                        <td className={`${cellPad} text-slate-700 dark:text-zinc-300`}>
+                          {row.description}
+                        </td>
+                        <td className={`${cellPad} text-right font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap`}>
+                          {row.moneyIn > 0 ? `${currency} ${formatAmount(row.moneyIn)}` : "—"}
+                        </td>
+                        <td className={`${cellPad} text-right font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap`}>
+                          {row.moneyOut > 0 ? `${currency} ${formatAmount(row.moneyOut)}` : "—"}
+                        </td>
+                        <td className={`${cellPad} text-right font-bold text-slate-900 dark:text-white whitespace-nowrap`}>
+                          {currency} {formatAmount(row.balance)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* VOUCHER ENTRY MODAL */}
+        {showModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                      voucherType === "CRV"
+                        ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                        : voucherType === "CPV"
+                        ? "bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
+                        : "bg-teal-50 dark:bg-teal-500/10 border-teal-200 dark:border-teal-500/30 text-teal-600 dark:text-teal-400"
+                    }`}
+                  >
+                    {voucherType === "CRV" ? (
+                      <ArrowDownLeft className="w-5 h-5" />
+                    ) : voucherType === "CPV" ? (
+                      <ArrowUpRight className="w-5 h-5" />
+                    ) : (
+                      <ArrowLeftRight className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">{modalTitle}</h2>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">
+                      Post an active double-entry cash voucher to the General Ledger.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                >
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleVoucherSubmit} className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+                      Voucher Date *
+                    </label>
+                    <input
+                      required
+                      type="date"
+                      value={vForm.date}
+                      onChange={(e) => setVForm({ ...vForm, date: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-lg p-2.5 text-sm outline-none focus:border-teal-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+                      Amount ({currency}) *
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={vForm.amount}
+                      onChange={(e) => setVForm({ ...vForm, amount: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-lg p-2.5 text-sm font-bold outline-none focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+                    {offsetLabel} *
+                  </label>
+                  <select
+                    required
+                    value={vForm.offsetAccountId}
+                    onChange={(e) => setVForm({ ...vForm, offsetAccountId: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-lg p-2.5 text-sm outline-none focus:border-teal-500 cursor-pointer"
+                  >
+                    <option value="">-- Select Chart of Account --</option>
+                    {allAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id} disabled={acc.id === selectedAccountId}>
+                        {acc.code} — {acc.name} ({acc.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+                    Invoice / Reference #
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. INV-2026-001"
+                    value={vForm.reference}
+                    onChange={(e) => setVForm({ ...vForm, reference: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-lg p-2.5 text-sm font-mono outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+                    Description / Narration *
+                  </label>
+                  <textarea
+                    required
+                    rows={2}
+                    placeholder="Reason for cash transaction..."
+                    value={vForm.description}
+                    onChange={(e) => setVForm({ ...vForm, description: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-lg p-2.5 text-sm outline-none focus:border-teal-500 resize-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-zinc-300 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all disabled:opacity-50 ${
+                      voucherType === "CRV"
+                        ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
+                        : voucherType === "CPV"
+                        ? "bg-rose-600 hover:bg-rose-500 shadow-rose-500/20"
+                        : "bg-teal-600 hover:bg-teal-500 shadow-teal-500/20"
+                    }`}
+                  >
+                    {submitting ? "Posting..." : "Post Voucher"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </ERPShell>
+        )}
+      </ERPShell>
+    </>
   );
 }

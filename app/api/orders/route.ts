@@ -28,7 +28,7 @@ export async function GET() {
     });
 
     const customers = await prisma.customer.findMany({ where: { companyId: company.id } });
-    const products = await prisma.product.findMany({ where: { companyId: company.id, type: "GOODS" } });
+    const products = await prisma.product.findMany({ where: { companyId: company.id, type: { in: ["PRODUCT", "GOODS"] } } });
 
     return NextResponse.json({ success: true, orders, customers, products, company });
   } catch (error: any) {
@@ -43,7 +43,18 @@ export async function POST(req: Request) {
     if (!company) throw new Error("No company found");
 
     const orderCount = await prisma.order.count({ where: { companyId: company.id } });
-    const orderNumber = `ORD-${String(orderCount + 1).padStart(5, '0')}`;
+    const lastOrder = await prisma.order.findFirst({
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    let nextNumber = 1;
+    if (lastOrder && lastOrder.orderNumber) {
+      const match = lastOrder.orderNumber.replace(/\D/g, '');
+      if (match) {
+        nextNumber = parseInt(match, 10) + 1;
+      }
+    }
+    const orderNumber = `ORD-${String(nextNumber).padStart(4, '0')}`;
 
     const order = await prisma.order.create({
       data: {

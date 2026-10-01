@@ -13,6 +13,9 @@ type Company = {
   city: string;
   country: string;
   currency: string;
+  storeName?: string;
+  storePolicyLink?: string;
+  enablePublicShop?: boolean;
 };
 
 const emptyCompany: Company = {
@@ -25,6 +28,9 @@ const emptyCompany: Company = {
   city: "",
   country: "Pakistan",
   currency: "PKR",
+  storeName: "",
+  storePolicyLink: "",
+  enablePublicShop: true,
 };
 
 function inputStyle(): React.CSSProperties {
@@ -103,6 +109,9 @@ export default function CompanySettingsPage() {
           city: data.company.city ?? "",
           country: data.company.country ?? "Pakistan",
           currency: data.company.currency ?? "PKR",
+          storeName: data.company.storeName ?? "",
+          storePolicyLink: data.company.storePolicyLink ?? "",
+          enablePublicShop: data.company.enablePublicShop ?? true,
         });
       } else {
         setCompany(emptyCompany);
@@ -122,7 +131,7 @@ export default function CompanySettingsPage() {
     loadCompany();
   }, []);
 
-  function updateField(field: keyof Company, value: string) {
+  function updateField(field: keyof Company, value: string | boolean) {
     setCompany((current) => ({
       ...current,
       [field]: value,
@@ -161,6 +170,9 @@ export default function CompanySettingsPage() {
           city: company.city,
           country: company.country,
           currency: company.currency,
+          storeName: company.storeName,
+          storePolicyLink: company.storePolicyLink,
+          enablePublicShop: company.enablePublicShop,
         }),
       });
 
@@ -184,6 +196,9 @@ export default function CompanySettingsPage() {
           city: data.company.city ?? "",
           country: data.company.country ?? "Pakistan",
           currency: data.company.currency ?? "PKR",
+          storeName: data.company.storeName ?? "",
+          storePolicyLink: data.company.storePolicyLink ?? "",
+          enablePublicShop: data.company.enablePublicShop ?? true,
         });
       }
 
@@ -294,7 +309,6 @@ export default function CompanySettingsPage() {
             >
               Business Information
             </h2>
-
             <p
               style={{
                 margin: "6px 0 0",
@@ -317,12 +331,9 @@ export default function CompanySettingsPage() {
               <label style={labelStyle()}>
                 Company Name <span style={{ color: "#dc2626" }}>*</span>
               </label>
-
               <input
                 value={company.name}
-                onChange={(event) =>
-                  updateField("name", event.target.value)
-                }
+                onChange={(event) => updateField("name", event.target.value)}
                 placeholder="Izan Bling"
                 style={inputStyle()}
               />
@@ -330,12 +341,9 @@ export default function CompanySettingsPage() {
 
             <div>
               <label style={labelStyle()}>Legal Name</label>
-
               <input
                 value={company.legalName}
-                onChange={(event) =>
-                  updateField("legalName", event.target.value)
-                }
+                onChange={(event) => updateField("legalName", event.target.value)}
                 placeholder="Izan Bling (Private) Limited"
                 style={inputStyle()}
               />
@@ -343,12 +351,9 @@ export default function CompanySettingsPage() {
 
             <div>
               <label style={labelStyle()}>NTN</label>
-
               <input
                 value={company.ntn}
-                onChange={(event) =>
-                  updateField("ntn", event.target.value)
-                }
+                onChange={(event) => updateField("ntn", event.target.value)}
                 placeholder="Enter NTN"
                 style={inputStyle()}
               />
@@ -356,13 +361,10 @@ export default function CompanySettingsPage() {
 
             <div>
               <label style={labelStyle()}>Email</label>
-
               <input
                 type="email"
                 value={company.email}
-                onChange={(event) =>
-                  updateField("email", event.target.value)
-                }
+                onChange={(event) => updateField("email", event.target.value)}
                 placeholder="company@example.com"
                 style={inputStyle()}
               />
@@ -370,12 +372,9 @@ export default function CompanySettingsPage() {
 
             <div>
               <label style={labelStyle()}>Phone</label>
-
               <input
                 value={company.phone}
-                onChange={(event) =>
-                  updateField("phone", event.target.value)
-                }
+                onChange={(event) => updateField("phone", event.target.value)}
                 placeholder="+92 300 0000000"
                 style={inputStyle()}
               />
@@ -383,29 +382,19 @@ export default function CompanySettingsPage() {
 
             <div>
               <label style={labelStyle()}>City</label>
-
               <input
                 value={company.city}
-                onChange={(event) =>
-                  updateField("city", event.target.value)
-                }
+                onChange={(event) => updateField("city", event.target.value)}
                 placeholder="Peshawar"
                 style={inputStyle()}
               />
             </div>
 
-            <div
-              style={{
-                gridColumn: "1 / -1",
-              }}
-            >
+            <div style={{ gridColumn: "1 / -1" }}>
               <label style={labelStyle()}>Address</label>
-
               <textarea
                 value={company.address}
-                onChange={(event) =>
-                  updateField("address", event.target.value)
-                }
+                onChange={(event) => updateField("address", event.target.value)}
                 placeholder="Business address"
                 style={textareaStyle()}
               />
@@ -436,7 +425,6 @@ export default function CompanySettingsPage() {
             >
               Regional Settings
             </h2>
-
             <p
               style={{
                 margin: "6px 0 0",
@@ -457,12 +445,9 @@ export default function CompanySettingsPage() {
           >
             <div>
               <label style={labelStyle()}>Country</label>
-
               <input
                 value={company.country}
-                onChange={(event) =>
-                  updateField("country", event.target.value)
-                }
+                onChange={(event) => updateField("country", event.target.value)}
                 placeholder="Pakistan"
                 style={inputStyle()}
               />
@@ -470,12 +455,9 @@ export default function CompanySettingsPage() {
 
             <div>
               <label style={labelStyle()}>Currency</label>
-
               <select
                 value={company.currency}
-                onChange={(event) =>
-                  updateField("currency", event.target.value)
-                }
+                onChange={(event) => updateField("currency", event.target.value)}
                 style={inputStyle()}
               >
                 <option value="PKR">PKR - Pakistani Rupee</option>
@@ -485,6 +467,91 @@ export default function CompanySettingsPage() {
                 <option value="GBP">GBP - British Pound</option>
                 <option value="EUR">EUR - Euro</option>
               </select>
+            </div>
+          </div>
+        </section>
+
+        <section
+          className="dashboard-panel"
+          style={{
+            marginBottom: "20px",
+            padding: "24px",
+          }}
+        >
+          <div
+            style={{
+              marginBottom: "22px",
+              paddingBottom: "16px",
+              borderBottom: "1px solid #e5e9f0",
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "17px",
+                color: "#172033",
+              }}
+            >
+              Storefront Configuration
+            </h2>
+            <p
+              style={{
+                margin: "6px 0 0",
+                fontSize: "13px",
+                color: "#667085",
+              }}
+            >
+              Settings linked to your public shop.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "20px",
+            }}
+          >
+            <div>
+              <label style={labelStyle()}>Public Store Name</label>
+              <input
+                value={company.storeName || ""}
+                onChange={(event) => updateField("storeName", event.target.value)}
+                placeholder="e.g. Izan Bling Official"
+                style={inputStyle()}
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle()}>Store Policy Link</label>
+              <input
+                value={company.storePolicyLink || ""}
+                onChange={(event) => updateField("storePolicyLink", event.target.value)}
+                placeholder="e.g. /policies/refund"
+                style={inputStyle()}
+              />
+            </div>
+
+            <div style={{ gridColumn: "1 / -1", marginTop: "10px" }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#344054",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={company.enablePublicShop ?? true}
+                  onChange={(event) => updateField("enablePublicShop", event.target.checked)}
+                  style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer" }}
+                />
+                Enable Public Storefront
+              </label>
             </div>
           </div>
         </section>
