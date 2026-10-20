@@ -1,0 +1,72 @@
+{
+  "general": {
+    "companyName": "Izan Bling",
+    "legalName": "",
+    "ntn": "",
+    "email": "",
+    "phone": "",
+    "address": "",
+    "country": "Pakistan",
+    "currency": "PKR",
+    "dateFormat": "DD/MM/YYYY",
+    "timeZone": "Asia/Karachi",
+    "decimalPlaces": 2
+  },
+  "purchases": {
+    "defaultBillStatus": "DRAFT",
+    "defaultPaymentTerms": "Net 30",
+    "allowDiscounts": true,
+    "allowTax": true,
+    "requireWarehouse": true,
+    "requireBatch": true,
+    "inventoryUpdateTiming": "ON_POST"
+  },
+  "sales": {
+    "allowCashSales": true,
+    "allowPartialPayments": true,
+    "requireCustomer": true,
+    "requireWarehouse": false,
+    "requireBatchSelection": true,
+    "defaultCourier": "TCS",
+    "defaultPaymentStatus": "PENDING",
+    "invoicePrefix": "INV-",
+    "defaultTaxRate": 4,
+    "courierPayableAccount": "cmuhf7mnt0002isr8ewoc2h3v",
+    "courierCollectionAccount": "cmuhfa2kd0004isr8qu1ok7nb",
+    "deliveryIncomeAccount": "cmuhf86p20003isr8rzp7rrcx",
+    "deliveryExpenseAccount": "cmuhfaltm0005isr8ufyw58rw",
+    "requireBatch": false,
+    "allowDiscount": true,
+    "storeName": "Izan Bling"
+  },
+  "inventory": {
+    "allowNegativeStock": false,
+    "allowStockAdjustments": true,
+    "costingMethod": "BATCH_ACTUAL",
+    "enableReorderAlerts": true
+  },
+  "numbering": {
+    "invoicePrefix": "INV-",
+    "purchaseBillPrefix": "PB-",
+    "journalPrefix": "JRN-",
+    "nextInvoiceNumber": 1,
+    "nextPurchaseBillNumber": 1
+  },
+  "appearance": {
+    "theme": "dark",
+    "sidebarMode": "expanded",
+    "dataDensity": "comfortable",
+    "invoiceTemplate": "modern",
+    "receiptTemplate": "standard",
+    "showLogoOnPrints": true,
+    "invoiceFooterNote": "Thank you for your business!",
+    "paymentInstructions": "",
+    "dashboard": {
+      "showKpis": true,
+      "showSalesChart": true,
+      "showStockChart": true,
+      "showActivity": true,
+      "showCategories": true
+    }
+  }
+}

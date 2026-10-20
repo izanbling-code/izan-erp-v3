@@ -1,0 +1,916 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ContactStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProductType {
+  PRODUCT
+  SERVICE
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+enum InvoiceStatus {
+  DRAFT
+  POSTED
+  PARTIAL
+  PAID
+  VOID
+}
+
+enum PurchaseStatus {
+  DRAFT
+  POSTED
+  PARTIAL
+  PAID
+  VOID
+}
+
+enum PaymentType {
+  RECEIPT
+  PAYMENT
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  CARD
+  ONLINE
+  OTHER
+}
+
+enum InventoryMovementType {
+  PURCHASE
+  SALE
+  SALE_RETURN
+  PURCHASE_RETURN
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+  OPENING
+}
+
+enum ReferenceType {
+  PURCHASE
+  SALE
+  PURCHASE_RETURN
+  SALE_RETURN
+  ADJUSTMENT
+  TRANSFER
+  OPENING
+}
+
+enum FiscalPeriodStatus {
+  OPEN
+  CLOSED
+}
+
+// ============================================================
+// COMPANY
+// ============================================================
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  legalName String?
+  ntn       String?
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  country   String   @default("Pakistan")
+  currency  String   @default("PKR")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  customers      Customer[]
+  suppliers      Supplier[]
+  categories     Category[]
+  brands         Brand[]
+  units          Unit[]
+  products       Product[]
+  warehouses     Warehouse[]
+  batches        InventoryBatch[]
+  accounts       Account[]
+  journals       JournalEntry[]
+  fiscalPeriods  FiscalPeriod[]
+  salesInvoices  SalesInvoice[]
+  purchaseBills  PurchaseBill[]
+  payments       Payment[]
+  inventoryMoves InventoryMovement[]
+
+  @@index([name])
+}
+
+// ============================================================
+// USERS & ROLES
+// ============================================================
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+}
+
+model User {
+  id        String     @id @default(cuid())
+  companyId String
+  roleId    String?
+
+  name     String
+  email    String     @unique
+  password String
+  status   UserStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role    Role?   @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  createdJournals  JournalEntry[] @relation("JournalCreatedBy")
+  postedJournals   JournalEntry[] @relation("JournalPostedBy")
+  createdPayments  Payment[]      @relation("PaymentCreatedBy")
+  createdInvoices  SalesInvoice[] @relation("SalesInvoiceCreatedBy")
+  createdPurchases PurchaseBill[] @relation("PurchaseBillCreatedBy")
+
+  @@index([companyId])
+  @@index([roleId])
+}
+
+// ============================================================
+// CUSTOMERS
+// ============================================================
+
+model Customer {
+  id        String @id @default(cuid())
+  companyId String
+
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  taxNumber String?
+
+  openingBalance Decimal       @default(0) @db.Decimal(18, 2)
+  creditLimit    Decimal       @default(0) @db.Decimal(18, 2)
+  status         ContactStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesInvoices SalesInvoice[]
+  payments      Payment[]
+
+  @@index([companyId])
+  @@index([name])
+}
+
+// ============================================================
+// SUPPLIERS
+// ============================================================
+
+model Supplier {
+  id        String @id @default(cuid())
+  companyId String
+
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  taxNumber String?
+
+  openingBalance Decimal       @default(0) @db.Decimal(18, 2)
+  creditLimit    Decimal       @default(0) @db.Decimal(18, 2)
+  status         ContactStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseBills PurchaseBill[]
+  payments      Payment[]
+  batches       InventoryBatch[]
+
+  @@index([companyId])
+  @@index([name])
+}
+
+// ============================================================
+// PRODUCT CATEGORIES
+// ============================================================
+
+model Category {
+  id          String @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+// ============================================================
+// BRANDS
+// ============================================================
+
+model Brand {
+  id          String @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+// ============================================================
+// UNITS
+// ============================================================
+
+model Unit {
+  id           String @id @default(cuid())
+  companyId    String
+
+  name         String
+  abbreviation String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+// ============================================================
+// PRODUCTS
+// ============================================================
+
+model Product {
+  id          String      @id @default(cuid())
+  companyId   String
+  categoryId  String?
+  brandId     String?
+  unitId      String?
+
+  sku         String
+  name        String
+  description String?
+  type        ProductType @default(PRODUCT)
+
+  // These remain as product-level reference values.
+  // Actual inventory valuation comes from InventoryBatch.
+  costPrice    Decimal @default(0) @db.Decimal(18, 2)
+  salePrice    Decimal @default(0) @db.Decimal(18, 2)
+  reorderLevel Decimal @default(0) @db.Decimal(18, 3)
+
+  isActive Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand    Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  stock          Stock[]
+  batches        InventoryBatch[]
+  inventoryMoves InventoryMovement[]
+  salesLines     SalesInvoiceLine[]
+  purchaseLines  PurchaseBillLine[]
+
+  inventoryAccountId String?
+  salesAccountId     String?
+  cogsAccountId      String?
+  purchaseAccountId  String?
+
+  inventoryAccount Account? @relation("ProductInventoryAccount", fields: [inventoryAccountId], references: [id], onDelete: SetNull)
+  salesAccount     Account? @relation("ProductSalesAccount", fields: [salesAccountId], references: [id], onDelete: SetNull)
+  cogsAccount      Account? @relation("ProductCOGSAccount", fields: [cogsAccountId], references: [id], onDelete: SetNull)
+  purchaseAccount  Account? @relation("ProductPurchaseAccount", fields: [purchaseAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, sku])
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([unitId])
+}
+
+// ============================================================
+// WAREHOUSES
+// ============================================================
+
+model Warehouse {
+  id        String @id @default(cuid())
+  companyId String
+
+  name    String
+  code    String
+  address String?
+  city    String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  stock   Stock[]
+  batches InventoryBatch[]
+
+  inventoryMovesFrom InventoryMovement[] @relation("MovementSourceWarehouse")
+  inventoryMovesTo   InventoryMovement[] @relation("MovementDestinationWarehouse")
+
+  @@unique([companyId, code])
+  @@index([companyId])
+}
+
+// ============================================================
+// STOCK SUMMARY
+// ============================================================
+//
+// Stock is a warehouse/product summary.
+// Individual batch quantities are maintained in InventoryBatch.
+//
+
+model Stock {
+  id          String @id @default(cuid())
+  productId   String
+  warehouseId String
+
+  quantity    Decimal @default(0) @db.Decimal(18, 3)
+  averageCost Decimal @default(0) @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, warehouseId])
+  @@index([productId])
+  @@index([warehouseId])
+}
+
+// ============================================================
+// INVENTORY BATCHES
+// ============================================================
+//
+// IMPORTANT:
+// This is the authoritative inventory-cost layer.
+//
+// Every purchased batch has:
+// - Product
+// - Warehouse
+// - Batch number
+// - Supplier
+// - Purchase bill
+// - Purchase date
+// - Original quantity
+// - Remaining quantity
+// - Exact unit cost
+//
+// NO EXPIRY DATE is used.
+//
+
+model InventoryBatch {
+  id          String @id @default(cuid())
+  companyId   String
+  productId   String
+  warehouseId String
+
+  batchNumber String
+
+  purchaseBillId String?
+  supplierId     String?
+
+  purchaseDate DateTime @default(now())
+
+  unitCost Decimal @db.Decimal(18, 2)
+
+  originalQuantity  Decimal @db.Decimal(18, 3)
+  remainingQuantity Decimal @db.Decimal(18, 3)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  purchaseBill PurchaseBill? @relation(fields: [purchaseBillId], references: [id], onDelete: SetNull)
+  supplier     Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  purchaseLines PurchaseBillLine[]
+  salesLines    SalesInvoiceLine[]
+  movements     InventoryMovement[]
+
+  @@unique([companyId, batchNumber])
+  @@index([companyId])
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([purchaseBillId])
+  @@index([supplierId])
+  @@index([batchNumber])
+  @@index([productId, warehouseId, remainingQuantity])
+}
+
+// ============================================================
+// INVENTORY MOVEMENTS
+// ============================================================
+//
+// Every movement can optionally identify the exact batch.
+//
+
+model InventoryMovement {
+  id        String @id @default(cuid())
+  companyId String
+  productId String
+  batchId   String?
+
+  sourceWarehouseId      String?
+  destinationWarehouseId String?
+
+  type          InventoryMovementType
+  referenceType ReferenceType?
+  referenceId   String?
+
+  quantity  Decimal @db.Decimal(18, 3)
+  unitCost  Decimal @default(0) @db.Decimal(18, 2)
+  totalCost Decimal @default(0) @db.Decimal(18, 2)
+
+  movementDate DateTime @default(now())
+  notes        String?
+
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  batch   InventoryBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  sourceWarehouse Warehouse? @relation("MovementSourceWarehouse", fields: [sourceWarehouseId], references: [id], onDelete: SetNull)
+
+  destinationWarehouse Warehouse? @relation("MovementDestinationWarehouse", fields: [destinationWarehouseId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([batchId])
+  @@index([movementDate])
+  @@index([referenceId])
+}
+
+// ============================================================
+// CHART OF ACCOUNTS
+// ============================================================
+
+model Account {
+  id          String      @id @default(cuid())
+  companyId   String
+  parentId    String?
+
+  code        String
+  name        String
+  type        AccountType
+  description String?
+
+  isActive Boolean @default(true)
+
+  systemCode String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  parent   Account?  @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Account[] @relation("AccountHierarchy")
+
+  journalLines JournalLine[]
+
+  inventoryProducts Product[] @relation("ProductInventoryAccount")
+  salesProducts     Product[] @relation("ProductSalesAccount")
+  cogsProducts      Product[] @relation("ProductCOGSAccount")
+  purchaseProducts  Product[] @relation("ProductPurchaseAccount")
+
+  paymentAccounts Payment[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([parentId])
+}
+
+// ============================================================
+// FISCAL PERIODS
+// ============================================================
+
+model FiscalPeriod {
+  id        String             @id @default(cuid())
+  companyId String
+
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  status    FiscalPeriodStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([startDate, endDate])
+}
+
+// ============================================================
+// JOURNAL ENTRIES
+// ============================================================
+
+model JournalEntry {
+  id          String        @id @default(cuid())
+  companyId   String
+
+  entryNumber String
+  entryDate   DateTime      @default(now())
+  reference   String?
+  description String?
+
+  status JournalStatus @default(DRAFT)
+
+  createdById String?
+  postedById  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdBy User? @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  postedBy  User? @relation("JournalPostedBy", fields: [postedById], references: [id], onDelete: SetNull)
+
+  lines JournalLine[]
+
+  salesInvoice SalesInvoice?
+  purchaseBill PurchaseBill?
+  payment      Payment?
+
+  @@unique([companyId, entryNumber])
+  @@index([companyId])
+  @@index([entryDate])
+}
+
+// ============================================================
+// JOURNAL LINES
+// ============================================================
+
+model JournalLine {
+  id             String @id @default(cuid())
+  journalEntryId String
+  accountId      String
+
+  description String?
+
+  debit  Decimal @default(0) @db.Decimal(18, 2)
+  credit Decimal @default(0) @db.Decimal(18, 2)
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([journalEntryId])
+  @@index([accountId])
+}
+
+// ============================================================
+// SALES INVOICES
+// ============================================================
+
+model SalesInvoice {
+  id          String    @id @default(cuid())
+  companyId   String
+  customerId  String
+
+  invoiceNo   String
+  invoiceDate DateTime  @default(now())
+  dueDate     DateTime?
+
+  status InvoiceStatus @default(DRAFT)
+
+  subtotal Decimal @default(0) @db.Decimal(18, 2)
+  discount Decimal @default(0) @db.Decimal(18, 2)
+  tax      Decimal @default(0) @db.Decimal(18, 2)
+  total    Decimal @default(0) @db.Decimal(18, 2)
+
+  paid    Decimal @default(0) @db.Decimal(18, 2)
+  balance Decimal @default(0) @db.Decimal(18, 2)
+
+  // Total COGS for this invoice.
+  cogs Decimal @default(0) @db.Decimal(18, 2)
+
+  notes String?
+
+  createdById String?
+  journalId   String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  createdBy User? @relation("SalesInvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  journal JournalEntry? @relation(fields: [journalId], references: [id], onDelete: SetNull)
+
+  lines       SalesInvoiceLine[]
+  allocations SalesPaymentAllocation[]
+
+  @@unique([companyId, invoiceNo])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([invoiceDate])
+  @@index([status])
+}
+
+// ============================================================
+// SALES INVOICE LINES
+// ============================================================
+//
+// IMPORTANT:
+// batchId identifies which inventory batch was sold.
+//
+// cogsUnitCost and cogsTotal are STORED at the time of posting.
+// This means historical COGS cannot accidentally change later
+// if somebody edits a batch's reference cost.
+//
+
+model SalesInvoiceLine {
+  id        String @id @default(cuid())
+  invoiceId String
+  productId String
+  batchId   String?
+
+  description String?
+
+  quantity  Decimal @db.Decimal(18, 3)
+  unitPrice Decimal @db.Decimal(18, 2)
+
+  discount Decimal @default(0) @db.Decimal(18, 2)
+  tax      Decimal @default(0) @db.Decimal(18, 2)
+  total    Decimal @default(0) @db.Decimal(18, 2)
+
+  warehouseId String?
+
+  // Exact cost captured from selected batch when sale is posted.
+  cogsUnitCost Decimal @default(0) @db.Decimal(18, 2)
+  cogsTotal    Decimal @default(0) @db.Decimal(18, 2)
+
+  invoice SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch   InventoryBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@index([productId])
+  @@index([batchId])
+  @@index([warehouseId])
+}
+
+// ============================================================
+// PURCHASE BILLS
+// ============================================================
+
+model PurchaseBill {
+  id         String    @id @default(cuid())
+  companyId  String
+  supplierId String
+
+  billNo   String
+  billDate DateTime  @default(now())
+  dueDate  DateTime?
+
+  status PurchaseStatus @default(DRAFT)
+
+  subtotal Decimal @default(0) @db.Decimal(18, 2)
+  discount Decimal @default(0) @db.Decimal(18, 2)
+  tax      Decimal @default(0) @db.Decimal(18, 2)
+  total    Decimal @default(0) @db.Decimal(18, 2)
+
+  paid    Decimal @default(0) @db.Decimal(18, 2)
+  balance Decimal @default(0) @db.Decimal(18, 2)
+
+  notes String?
+
+  createdById String?
+  journalId   String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  createdBy User? @relation("PurchaseBillCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  journal JournalEntry? @relation(fields: [journalId], references: [id], onDelete: SetNull)
+
+  lines       PurchaseBillLine[]
+  allocations PurchasePaymentAllocation[]
+  batches     InventoryBatch[]
+
+  @@unique([companyId, billNo])
+  @@index([companyId])
+  @@index([supplierId])
+  @@index([billDate])
+  @@index([status])
+}
+
+// ============================================================
+// PURCHASE BILL LINES
+// ============================================================
+//
+// A purchase line can create/link exactly one batch.
+//
+// Example:
+//
+// Product: Rolex Style Watch
+// Quantity: 20
+// Unit cost: 2,000
+// Batch: B-2026-001
+//
+// A later purchase:
+//
+// Product: Rolex Style Watch
+// Quantity: 15
+// Unit cost: 2,350
+// Batch: B-2026-002
+//
+
+model PurchaseBillLine {
+  id        String @id @default(cuid())
+  billId    String
+  productId String
+  batchId   String?
+
+  description String?
+
+  quantity Decimal @db.Decimal(18, 3)
+  unitCost Decimal @db.Decimal(18, 2)
+
+  discount Decimal @default(0) @db.Decimal(18, 2)
+  tax      Decimal @default(0) @db.Decimal(18, 2)
+  total    Decimal @default(0) @db.Decimal(18, 2)
+
+  warehouseId String?
+
+  bill    PurchaseBill   @relation(fields: [billId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch   InventoryBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([billId])
+  @@index([productId])
+  @@index([batchId])
+  @@index([warehouseId])
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+
+model Payment {
+  id         String @id @default(cuid())
+  companyId  String
+  customerId String?
+  supplierId String?
+  accountId  String
+
+  paymentNo   String
+  paymentDate DateTime @default(now())
+
+  type   PaymentType
+  method PaymentMethod @default(CASH)
+
+  amount      Decimal @db.Decimal(18, 2)
+  reference   String?
+  description String?
+
+  journalId   String? @unique
+  createdById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  journal   JournalEntry? @relation(fields: [journalId], references: [id], onDelete: SetNull)
+  createdBy User?         @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  salesAllocations    SalesPaymentAllocation[]
+  purchaseAllocations PurchasePaymentAllocation[]
+
+  @@unique([companyId, paymentNo])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([supplierId])
+  @@index([accountId])
+  @@index([paymentDate])
+}
+
+// ============================================================
+// SALES PAYMENT ALLOCATION
+// ============================================================
+
+model SalesPaymentAllocation {
+  id        String @id @default(cuid())
+  paymentId String
+  invoiceId String
+
+  amount Decimal @db.Decimal(18, 2)
+
+  payment Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([paymentId, invoiceId])
+  @@index([paymentId])
+  @@index([invoiceId])
+}
+
+// ============================================================
+// PURCHASE PAYMENT ALLOCATION
+// ============================================================
+
+model PurchasePaymentAllocation {
+  id        String @id @default(cuid())
+  paymentId String
+  billId    String
+
+  amount Decimal @db.Decimal(18, 2)
+
+  payment Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  bill    PurchaseBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@unique([paymentId, billId])
+  @@index([paymentId])
+  @@index([billId])
+}

@@ -1,0 +1,12 @@
+# Izan Bling ERP - Module Execution Checklist
+
+Before writing code for a new module, the AI must verify the following:
+
+- [ ] **Architecture Check:** Does this feature fit the database-driven / Supabase paradigm? Are we avoiding unnecessary hardcoded logic?
+- [ ] **Memory Check:** Are the file paths, component names, and database models referenced correctly according to `memory.md`?
+- [ ] **Design Check (Admin):** If building an Admin tool, is it adhering to the Forced Dark Mode and Canva-style simplicity outlined in `design.md`?
+- [ ] **Design Check (Storefront):** If building a customer feature, does it integrate with the dynamic JSON-driven rendering?
+- [ ] **Next.js Validation:** Are all dynamic route `params` properly `await`ed?
+- [ ] **Data Safety:** Are `POST`/`PUT` endpoints using deep-merge to protect existing JSON settings?
+
+*If all checks pass, proceed to generate the code.*

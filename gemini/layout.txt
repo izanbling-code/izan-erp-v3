@@ -1,0 +1,37 @@
+﻿import "@/app/globals.css";
+import ShopNavbar from "@/app/components/ShopNavbar";
+import CartDrawer from "@/app/components/CartDrawer";
+
+export const metadata = {
+  title: "Izan Bling Store",
+  description: "Elevate your aesthetic.",
+};
+
+export default function StorefrontLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning className="min-h-screen bg-white flex flex-col font-sans text-slate-900 antialiased">
+        <ShopNavbar />
+        
+        <div className="flex-grow">
+          {children}
+        </div>
+        
+        <CartDrawer />
+
+        {/* Global Public Footer */}
+        <footer className="bg-slate-50 border-t border-slate-200 mt-auto py-12">
+          <div className="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+            <div>
+              <h3 className="font-bold uppercase tracking-widest text-slate-900 mb-4">Izan Bling</h3>
+              <p className="text-slate-500">Elevate your aesthetic.</p>
+            </div>
+            <div className="md:text-right text-slate-500">
+              <p>&copy; 2026 Izan Bling. All rights reserved.</p>
+            </div>
+          </div>
+        </footer>
+      </body>
+    </html>
+  );
+}

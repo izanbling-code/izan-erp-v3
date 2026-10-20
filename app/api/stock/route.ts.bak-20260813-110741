@@ -1,0 +1,96 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+export async function GET() {
+  try {
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const [stock, warehouses, products] = await Promise.all([
+      prisma.stock.findMany({
+        where: {
+          product: {
+            companyId: company.id,
+          },
+        },
+        include: {
+          product: {
+            include: {
+              category: true,
+              brand: true,
+              unit: true,
+            },
+          },
+          warehouse: true,
+        },
+        orderBy: [
+          {
+            warehouse: {
+              name: "asc",
+            },
+          },
+          {
+            product: {
+              name: "asc",
+            },
+          },
+        ],
+      }),
+
+      prisma.warehouse.findMany({
+        where: {
+          companyId: company.id,
+          isActive: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      }),
+
+      prisma.product.findMany({
+        where: {
+          companyId: company.id,
+          isActive: true,
+        },
+        include: {
+          category: true,
+          brand: true,
+          unit: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      }),
+    ]);
+
+    return NextResponse.json({
+      ok: true,
+      stock,
+      warehouses,
+      products,
+    });
+  } catch (error) {
+    console.error("GET /api/stock error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load stock",
+      },
+      { status: 500 }
+    );
+  }
+}

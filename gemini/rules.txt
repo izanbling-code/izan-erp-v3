@@ -1,0 +1,8 @@
+# Izan Bling ERP - Coding Rules
+
+1.  **No Hardcoding:** Never hardcode store content, products, promotional banners, or questions into the UI files. Everything must be editable via the Admin panel and fetched dynamically.
+2.  **Next.js 15+ Compliance:** All dynamic route parameters (e.g., `params.slug`, `params.id`) and `searchParams` MUST be explicitly unwrapped using `await` before access to prevent rendering crashes.
+3.  **Non-Destructive JSON Updates:** When updating `CompanySettings` (like adding a new page), always fetch the existing configuration first and deep-merge the new data so other pages/settings are not erased.
+4.  **Graceful Fallbacks:** All database fetches and API calls must include `try/catch` blocks. If an API fails or a design canvas is empty, render a polite fallback UI instead of crashing the page.
+5.  **Client-Side Isolation:** Complex third-party visual tools (like GrapesJS) must be wrapped securely in `useEffect` to ensure they only render on the client side, avoiding SSR hydration errors.
+6.  **Absolute Imports:** Always use the `@/` alias for internal imports (e.g., `import { prisma } from "@/app/lib/prisma";`).

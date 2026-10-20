@@ -1,0 +1,15 @@
+# Izan Bling ERP - Design Language
+
+## 1. Global Theming System
+*   **Dynamic CSS Variables:** The software avoids hardcoded Tailwind color classes (like `text-blue-500`) for global branding. Instead, it uses CSS variables (e.g., `var(--theme-primary)`) configured in the database.
+*   **Cross-System Consistency:** Changing a color in the Admin Settings instantly updates the styling across the entire ERP and the customer storefront.
+
+## 2. Admin Panel UI (The "Canva" Philosophy)
+*   **Forced Dark Mode:** The ERP Visual Builder strictly uses a dark theme (`bg-slate-900`, `bg-zinc-950`, `text-white`) regardless of the user's system preferences. This mimics high-end creative software like Premiere Pro or Canva.
+*   **No Developer Tools:** The default GrapesJS developer panels (CSS layers, trait managers, raw code editors) are strictly hidden. 
+*   **Contextual Toolbars:** Tools appear contextually (e.g., a simple color picker or font-size input appears at the top only when an element is clicked).
+*   **Absolute Freedom:** The canvas uses Absolute Drag Mode. Elements can be placed anywhere, layered using Z-index, and locked in place to prevent accidental movement.
+
+## 3. Storefront UI (Customer Facing)
+*   **JSON-Driven Rendering:** Customer pages do not use static React layouts. They fetch raw HTML/CSS blobs from the database and render them dynamically.
+*   **High-End Aesthetic:** The storefront defaults to a luxury e-commerce aesthetic—clean typography, edge-to-edge images, ample whitespace, and sleek animations (fade-ins, slide-ups).

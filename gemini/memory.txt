@@ -1,0 +1,19 @@
+# Izan Bling ERP - Memory Map
+
+## Key Database Models (Prisma + Supabase)
+*   `Company`: The root tenant/owner of the ERP.
+*   `CompanySettings`: Stores global configs and the JSON configuration for the visual storefront (e.g., `storefront.pages.[slug].rawHtml`).
+*   `Product`: Contains inventory data (`name`, `salePrice`, `compareAtPrice`, `imageUrl`, `type`, `isActive`).
+*   `StorefrontQuiz`, `QuizNode`, `QuizChoice`: The directed-graph engine for infinite branching funnels and questionnaires.
+
+## Critical File Paths
+*   **Admin Visual Builder:** `app/(storefront)/shop/admin/design/page.tsx`
+*   **Funnels Manager:** `app/(storefront)/shop/admin/funnels/page.tsx`
+*   **Storefront Dynamic Renderer:** `app/(storefront)/shop/p/[slug]/page.tsx`
+*   **Main Storefront Home:** `app/(storefront)/shop/page.tsx`
+*   **Global UI Components:** `app/components/` (e.g., `<AddToCartButton />`)
+*   **Database/Supabase Clients:** `app/lib/prisma.ts` and `app/lib/supabase.ts`
+
+## Data Fetching Paradigm
+*   Use the **Supabase Client** directly in server components and client components where possible for fast CRUD operations.
+*   Use Next.js Route Handlers (`app/api/...`) only for complex operations, deep-merging JSON, or secure webhooks.

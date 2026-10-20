@@ -1,0 +1,1781 @@
+﻿import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+/*
+ * ============================================================
+ * PURCHASE BILLS API
+ * ============================================================
+ *
+ * Supports:
+ *
+ * GET    /api/purchases/bills
+ * POST   /api/purchases/bills
+ * PUT    /api/purchases/bills
+ * DELETE /api/purchases/bills?id=...
+ *
+ * Batch-based inventory:
+ *
+ * Purchase Bill
+ *      â†“
+ * Inventory Batch
+ *      â†“
+ * Stock Batch
+ *      â†“
+ * Warehouse Stock
+ *      â†“
+ * Inventory Movement
+ *
+ * IMPORTANT:
+ * COGS is NOT calculated here.
+ * COGS is calculated when a specific batch is selected
+ * on a sales invoice.
+ */
+
+/* ============================================================
+   TYPES
+   ============================================================ */
+
+type PurchaseLineInput = {
+  id?: string;
+
+  productId: string;
+
+  /*
+   * Existing batch can be supplied.
+   *
+   * If batchId is omitted, a new batch will be created.
+   */
+  batchId?: string | null;
+
+  /*
+   * Optional batch number when creating a new batch.
+   * If omitted, the API generates one.
+   */
+  batchNumber?: string | null;
+
+  quantity: number;
+  unitCost: number;
+
+  discount?: number;
+  tax?: number;
+
+  warehouseId: string;
+
+  description?: string | null;
+};
+
+type PurchaseBillInput = {
+  id?: string;
+
+  supplierId: string;
+  billNo: string;
+
+  billDate?: string;
+  dueDate?: string | null;
+
+  status?: "DRAFT" | "POSTED" | "PARTIAL" | "PAID" | "VOID";
+
+  discount?: number;
+  tax?: number;
+
+  notes?: string | null;
+
+  lines: PurchaseLineInput[];
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
+function decimalNumber(value: unknown): number {
+  const number = Number(value ?? 0);
+
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+
+  return number;
+}
+
+function cleanString(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const result = String(value).trim();
+
+  return result.length > 0 ? result : null;
+}
+
+function parseDate(
+  value: unknown,
+  fallback: Date = new Date()
+): Date {
+  if (!value) {
+    return fallback;
+  }
+
+  const date = new Date(String(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+
+  return date;
+}
+
+function calculateLineTotal(line: PurchaseLineInput) {
+  const quantity = decimalNumber(line.quantity);
+  const unitCost = decimalNumber(line.unitCost);
+  const discount = decimalNumber(line.discount);
+  const tax = decimalNumber(line.tax);
+
+  const gross = quantity * unitCost;
+
+  const netBeforeTax = Math.max(0, gross - discount);
+
+  return netBeforeTax + tax;
+}
+
+function generateBatchNumber() {
+  const now = new Date();
+
+  const datePart = now
+    .toISOString()
+    .replace(/[-:TZ.]/g, "")
+    .slice(0, 14);
+
+  const randomPart = Math.random()
+    .toString(36)
+    .substring(2, 7)
+    .toUpperCase();
+
+  return `B-${datePart}-${randomPart}`;
+}
+
+/* ============================================================
+   GET
+   ============================================================ */
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+
+    const id = searchParams.get("id");
+    const search = searchParams.get("search");
+
+    /*
+     * --------------------------------------------------------
+     * SINGLE BILL
+     * --------------------------------------------------------
+     */
+
+    if (id) {
+      const bill = await prisma.purchaseBill.findUnique({
+        where: {
+          id,
+        },
+
+        include: {
+          supplier: true,
+
+          company: true,
+
+          lines: {
+            include: {
+              product: {
+                include: {
+                  unit: true,
+                  brand: true,
+                  category: true,
+                },
+              },
+
+              batch: true,
+
+              warehouse: true,
+            },
+
+            orderBy: {
+              id: "asc",
+            },
+          },
+
+          allocations: {
+            include: {
+              payment: true,
+            },
+          },
+
+          journal: {
+            include: {
+              lines: {
+                include: {
+                  account: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!bill) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Purchase bill not found",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        bill,
+      });
+    }
+
+    /*
+     * --------------------------------------------------------
+     * BILL LIST
+     * --------------------------------------------------------
+     */
+
+    const bills = await prisma.purchaseBill.findMany({
+      where: search
+        ? {
+            OR: [
+              {
+                billNo: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+
+              {
+                supplier: {
+                  name: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+              },
+            ],
+          }
+        : undefined,
+
+      include: {
+        supplier: true,
+
+        lines: {
+          include: {
+            product: true,
+            batch: true,
+            warehouse: true,
+          },
+        },
+
+        allocations: true,
+      },
+
+      orderBy: {
+        billDate: "desc",
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      bills,
+    });
+  } catch (error) {
+    console.error("GET /api/purchases/bills error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load purchase bills",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+/* ============================================================
+   POST
+   ============================================================ */
+
+export async function POST(request: NextRequest) {
+  try {
+    const body =
+      (await request.json()) as PurchaseBillInput;
+
+    /*
+     * --------------------------------------------------------
+     * BASIC VALIDATION
+     * --------------------------------------------------------
+     */
+
+    const supplierId = cleanString(body.supplierId);
+
+    const billNo = cleanString(body.billNo);
+
+    if (!supplierId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!billNo) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Bill number is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!Array.isArray(body.lines) || body.lines.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "At least one purchase item is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * TEMPORARY SINGLE COMPANY CONTEXT
+     * --------------------------------------------------------
+     */
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!company) {
+      throw new Error("No company has been configured yet.");
+    }
+
+    /*
+     * --------------------------------------------------------
+     * SUPPLIER
+     * --------------------------------------------------------
+     */
+
+    const supplier = await prisma.supplier.findFirst({
+      where: {
+        id: supplierId,
+        companyId: company.id,
+      },
+    });
+
+    if (!supplier) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier not found",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * NORMALIZE LINES
+     * --------------------------------------------------------
+     */
+
+    const lines = body.lines.map((line) => {
+      const quantity = decimalNumber(line.quantity);
+      const unitCost = decimalNumber(line.unitCost);
+      const discount = decimalNumber(line.discount);
+      const tax = decimalNumber(line.tax);
+
+      if (!line.productId) {
+        throw new Error(
+          "Every purchase line must have a product"
+        );
+      }
+
+      if (!line.warehouseId) {
+        throw new Error(
+          "Every purchase line must have a warehouse"
+        );
+      }
+
+      if (quantity <= 0) {
+        throw new Error(
+          "Purchase quantity must be greater than zero"
+        );
+      }
+
+      if (unitCost < 0) {
+        throw new Error(
+          "Purchase cost cannot be negative"
+        );
+      }
+
+      if (discount < 0) {
+        throw new Error(
+          "Discount cannot be negative"
+        );
+      }
+
+      if (tax < 0) {
+        throw new Error(
+          "Tax cannot be negative"
+        );
+      }
+
+      return {
+        ...line,
+        quantity,
+        unitCost,
+        discount,
+        tax,
+        total:
+          quantity * unitCost -
+          discount +
+          tax,
+      };
+    });
+
+    /*
+     * --------------------------------------------------------
+     * VALIDATE PRODUCTS AND WAREHOUSES
+     * --------------------------------------------------------
+     */
+
+    const productIds = [
+      ...new Set(lines.map((line) => line.productId)),
+    ];
+
+    const warehouseIds = [
+      ...new Set(lines.map((line) => line.warehouseId)),
+    ];
+
+    const products = await prisma.product.findMany({
+      where: {
+        companyId: company.id,
+        id: {
+          in: productIds,
+        },
+      },
+    });
+
+    const warehouses = await prisma.warehouse.findMany({
+      where: {
+        companyId: company.id,
+        id: {
+          in: warehouseIds,
+        },
+      },
+    });
+
+    if (products.length !== productIds.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "One or more selected products are invalid",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (warehouses.length !== warehouseIds.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "One or more selected warehouses are invalid",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * CALCULATE TOTALS
+     * --------------------------------------------------------
+     */
+
+    const lineSubtotal = lines.reduce(
+      (sum, line) =>
+        sum +
+        line.quantity * line.unitCost,
+      0
+    );
+
+    const lineDiscount = lines.reduce(
+      (sum, line) =>
+        sum + line.discount,
+      0
+    );
+
+    const lineTax = lines.reduce(
+      (sum, line) =>
+        sum + line.tax,
+      0
+    );
+
+    const subtotal = lineSubtotal;
+
+    /*
+     * Bill-level discount/tax are supported as well.
+     *
+     * If the UI sends them, they are added to the
+     * calculated line values.
+     */
+    const billDiscount =
+      decimalNumber(body.discount);
+
+    const billTax =
+      decimalNumber(body.tax);
+
+    const totalDiscount =
+      lineDiscount + billDiscount;
+
+    const totalTax =
+      lineTax + billTax;
+
+    const total =
+      subtotal -
+      totalDiscount +
+      totalTax;
+
+    /*
+     * --------------------------------------------------------
+     * STATUS
+     * --------------------------------------------------------
+     *
+     * Default is DRAFT.
+     *
+     * A draft does NOT affect stock.
+     *
+     * A POSTED purchase DOES affect stock.
+     */
+
+    const status =
+      body.status === "POSTED"
+        ? "POSTED"
+        : "DRAFT";
+
+    /*
+     * --------------------------------------------------------
+     * TRANSACTION
+     * --------------------------------------------------------
+     */
+
+    const result =
+      await prisma.$transaction(
+        async (tx) => {
+          /*
+           * --------------------------------------------------
+           * CREATE PURCHASE BILL
+           * --------------------------------------------------
+           */
+
+          const bill =
+            await tx.purchaseBill.create({
+              data: {
+                companyId: company.id,
+                supplierId: supplier.id,
+                billNo,
+                billDate: parseDate(
+                  body.billDate
+                ),
+                dueDate: body.dueDate
+                  ? parseDate(body.dueDate)
+                  : null,
+
+                status,
+
+                subtotal,
+                discount: totalDiscount,
+                tax: totalTax,
+                total,
+
+                paid: 0,
+                balance: total,
+
+                notes:
+                  cleanString(body.notes),
+
+                lines: {
+                  create: [],
+                },
+              },
+            });
+
+          /*
+           * --------------------------------------------------
+           * PROCESS EACH PURCHASE LINE
+           * --------------------------------------------------
+           */
+
+          for (const line of lines) {
+            /*
+             * Find product.
+             */
+
+            const product =
+              products.find(
+                (item) =>
+                  item.id === line.productId
+              );
+
+            if (!product) {
+              throw new Error(
+                "Product not found"
+              );
+            }
+
+            /*
+             * ------------------------------------------------
+             * BATCH
+             * ------------------------------------------------
+             *
+             * If a batchId was supplied, use the existing batch.
+             *
+             * Otherwise create a new batch.
+             */
+
+            let batch;
+
+            if (line.batchId) {
+              batch =
+                await tx.inventoryBatch.findFirst(
+                  {
+                    where: {
+                      id: line.batchId,
+                      companyId: company.id,
+                      productId: product.id,
+                    },
+                  }
+                );
+
+              if (!batch) {
+                throw new Error(
+                  `Batch not found for product ${product.name}`
+                );
+              }
+
+              /*
+               * Existing batch:
+               *
+               * We intentionally DO NOT silently change its
+               * cost because a batch represents one historical
+               * cost layer.
+               *
+               * If a different cost is supplied, reject it.
+               */
+
+              if (
+                Number(batch.unitCost) !==
+                Number(line.unitCost)
+              ) {
+                throw new Error(
+                  `Batch ${batch.batchNumber} already has a different unit cost`
+                );
+              }
+            } else {
+              /*
+               * Create a new batch.
+               */
+
+              let batchNumber =
+                cleanString(
+                  line.batchNumber
+                );
+
+              if (!batchNumber) {
+                batchNumber =
+                  generateBatchNumber();
+              }
+
+              /*
+               * Make sure the generated batch number
+               * is unique for this company/product.
+               */
+
+              let existing =
+                await tx.inventoryBatch.findFirst(
+                  {
+                    where: {
+                      companyId: company.id,
+                      productId: product.id,
+                      batchNumber,
+                    },
+                  }
+                );
+
+              while (existing) {
+                batchNumber =
+                  generateBatchNumber();
+
+                existing =
+                  await tx.inventoryBatch.findFirst(
+                    {
+                      where: {
+                        companyId: company.id,
+                        productId: product.id,
+                        batchNumber,
+                      },
+                    }
+                  );
+              }
+
+              batch =
+                await tx.inventoryBatch.create(
+                  {
+                    data: {
+                      companyId:
+                        company.id,
+
+                      productId:
+                        product.id,
+
+                      batchNumber,
+
+                      purchaseBillId:
+                        bill.id,
+
+                      supplierId:
+                        supplier.id,
+
+                      purchaseDate:
+                        bill.billDate,
+
+                      unitCost:
+                        line.unitCost,
+
+                      originalQuantity:
+                        line.quantity,
+
+                      isActive: true,
+                    },
+                  }
+                );
+            }
+
+            /*
+             * ------------------------------------------------
+             * PURCHASE BILL LINE
+             * ------------------------------------------------
+             */
+
+            await tx.purchaseBillLine.create(
+              {
+                data: {
+                  billId: bill.id,
+
+                  productId:
+                    product.id,
+
+                  batchId:
+                    batch.id,
+
+                  description:
+                    cleanString(
+                      line.description
+                    ),
+
+                  quantity:
+                    line.quantity,
+
+                  unitCost:
+                    line.unitCost,
+
+                  discount:
+                    line.discount,
+
+                  tax:
+                    line.tax,
+
+                  total:
+                    line.total,
+
+                  warehouseId:
+                    line.warehouseId,
+                },
+              }
+            );
+
+            /*
+             * ------------------------------------------------
+             * ONLY POSTED PURCHASES AFFECT INVENTORY
+             * ------------------------------------------------
+             */
+
+            if (status === "POSTED") {
+              /*
+               * ----------------------------------------------
+               * BATCH STOCK
+               * ----------------------------------------------
+               */
+
+              const existingBatchStock =
+                await tx.stockBatch.findUnique(
+                  {
+                    where: {
+                      batchId_warehouseId: {
+                        batchId:
+                          batch.id,
+
+                        warehouseId:
+                          line.warehouseId,
+                      },
+                    },
+                  }
+                );
+
+              if (
+                existingBatchStock
+              ) {
+                await tx.stockBatch.update(
+                  {
+                    where: {
+                      id:
+                        existingBatchStock.id,
+                    },
+
+                    data: {
+                      quantity: {
+                        increment:
+                          line.quantity,
+                      },
+                    },
+                  }
+                );
+              } else {
+                await tx.stockBatch.create(
+                  {
+                    data: {
+                      batchId:
+                        batch.id,
+
+                      productId:
+                        product.id,
+
+                      warehouseId:
+                        line.warehouseId,
+
+                      quantity:
+                        line.quantity,
+                    },
+                  }
+                );
+              }
+
+              /*
+               * ----------------------------------------------
+               * TOTAL PRODUCT STOCK
+               * ----------------------------------------------
+               */
+
+              const existingStock =
+                await tx.stock.findUnique(
+                  {
+                    where: {
+                      productId_warehouseId: {
+                        productId:
+                          product.id,
+
+                        warehouseId:
+                          line.warehouseId,
+                      },
+                    },
+                  }
+                );
+
+              if (existingStock) {
+                const oldQuantity =
+                  Number(
+                    existingStock.quantity
+                  );
+
+                const oldAverageCost =
+                  Number(
+                    existingStock.averageCost
+                  );
+
+                const newQuantity =
+                  oldQuantity +
+                  line.quantity;
+
+                const newAverageCost =
+                  newQuantity > 0
+                    ? (
+                        oldQuantity *
+                          oldAverageCost +
+                        line.quantity *
+                          line.unitCost
+                      ) /
+                      newQuantity
+                    : line.unitCost;
+
+                await tx.stock.update(
+                  {
+                    where: {
+                      id:
+                        existingStock.id,
+                    },
+
+                    data: {
+                      quantity:
+                        newQuantity,
+
+                      averageCost:
+                        newAverageCost,
+                    },
+                  }
+                );
+              } else {
+                await tx.stock.create(
+                  {
+                    data: {
+                      productId:
+                        product.id,
+
+                      warehouseId:
+                        line.warehouseId,
+
+                      quantity:
+                        line.quantity,
+
+                      averageCost:
+                        line.unitCost,
+                    },
+                  }
+                );
+              }
+
+              /*
+               * ----------------------------------------------
+               * INVENTORY MOVEMENT
+               * ----------------------------------------------
+               */
+
+              await tx.inventoryMovement.create(
+                {
+                  data: {
+                    companyId:
+                      company.id,
+
+                    productId:
+                      product.id,
+
+                    batchId:
+                      batch.id,
+
+                    destinationWarehouseId:
+                      line.warehouseId,
+
+                    type: "PURCHASE",
+
+                    referenceType:
+                      "PURCHASE",
+
+                    referenceId:
+                      bill.id,
+
+                    quantity:
+                      line.quantity,
+
+                    unitCost:
+                      line.unitCost,
+
+                    totalCost:
+                      line.quantity *
+                      line.unitCost,
+
+                    movementDate:
+                      bill.billDate,
+
+                    notes:
+                      `Purchase Bill ${bill.billNo}`,
+                  },
+                }
+              );
+            }
+          }
+
+          /*
+           * --------------------------------------------------
+           * RETURN COMPLETE BILL
+           * --------------------------------------------------
+           */
+
+          return tx.purchaseBill.findUnique(
+            {
+              where: {
+                id: bill.id,
+              },
+
+              include: {
+                supplier: true,
+
+                lines: {
+                  include: {
+                    product: true,
+                    batch: true,
+                    warehouse: true,
+                  },
+                },
+              },
+            }
+          );
+        }
+      );
+
+    return NextResponse.json(
+      {
+        ok: true,
+        bill: result,
+      },
+      {
+        status: 201,
+      }
+    );
+  } catch (error) {
+    console.error(
+      "POST /api/purchases/bills error:",
+      error
+    );
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to create purchase bill";
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: message,
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+/* ============================================================
+   PUT
+   ============================================================ */
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body =
+      (await request.json()) as PurchaseBillInput;
+
+    if (!body.id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Purchase bill ID is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const existing =
+      await prisma.purchaseBill.findUnique({
+        where: {
+          id: body.id,
+        },
+
+        include: {
+          lines: true,
+        },
+      });
+
+    if (!existing) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Purchase bill not found",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * IMPORTANT
+     * --------------------------------------------------------
+     *
+     * Posted bills are protected from ordinary editing.
+     *
+     * This prevents inventory corruption.
+     *
+     * Later we can implement a proper "Reverse and Edit"
+     * workflow.
+     */
+
+    if (
+      existing.status === "POSTED" ||
+      existing.status === "PARTIAL" ||
+      existing.status === "PAID"
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Posted purchase bills cannot be edited directly. Reverse the bill first.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    if (!body.supplierId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !Array.isArray(body.lines) ||
+      body.lines.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "At least one purchase line is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const company =
+      await prisma.company.findFirst({
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "No company has been configured",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!company) {
+      throw new Error("No company has been configured yet.");
+    }
+
+    const supplier =
+      await prisma.supplier.findFirst({
+        where: {
+          id: body.supplierId,
+          companyId: company.id,
+        },
+      });
+
+    if (!supplier) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier not found",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    const lines = body.lines.map(
+      (line) => {
+        const quantity =
+          decimalNumber(
+            line.quantity
+          );
+
+        const unitCost =
+          decimalNumber(
+            line.unitCost
+          );
+
+        const discount =
+          decimalNumber(
+            line.discount
+          );
+
+        const tax =
+          decimalNumber(line.tax);
+
+        if (quantity <= 0) {
+          throw new Error(
+            "Quantity must be greater than zero"
+          );
+        }
+
+        if (unitCost < 0) {
+          throw new Error(
+            "Unit cost cannot be negative"
+          );
+        }
+
+        if (!line.productId) {
+          throw new Error(
+            "Product is required"
+          );
+        }
+
+        if (!line.warehouseId) {
+          throw new Error(
+            "Warehouse is required"
+          );
+        }
+
+        return {
+          ...line,
+          quantity,
+          unitCost,
+          discount,
+          tax,
+          total:
+            quantity * unitCost -
+            discount +
+            tax,
+        };
+      }
+    );
+
+    const subtotal =
+      lines.reduce(
+        (sum, line) =>
+          sum +
+          line.quantity *
+            line.unitCost,
+        0
+      );
+
+    const lineDiscount =
+      lines.reduce(
+        (sum, line) =>
+          sum + line.discount,
+        0
+      );
+
+    const lineTax =
+      lines.reduce(
+        (sum, line) =>
+          sum + line.tax,
+        0
+      );
+
+    const billDiscount =
+      decimalNumber(body.discount);
+
+    const billTax =
+      decimalNumber(body.tax);
+
+    const discount =
+      lineDiscount +
+      billDiscount;
+
+    const tax =
+      lineTax +
+      billTax;
+
+    const total =
+      subtotal -
+      discount +
+      tax;
+
+    const updated =
+      await prisma.$transaction(
+        async (tx) => {
+          /*
+           * Delete old draft lines.
+           *
+           * Batches are NOT deleted because an existing
+           * batch may have been created by this draft.
+           * Unused batches remain harmless and can later
+           * be cleaned by an inventory utility.
+           */
+
+          await tx.purchaseBillLine.deleteMany(
+            {
+              where: {
+                billId: String(body.id),
+              },
+            }
+          );
+
+          /*
+           * Update header.
+           */
+
+          await tx.purchaseBill.update(
+            {
+              where: {
+                id: body.id,
+              },
+
+              data: {
+                supplierId:
+                  supplier.id,
+
+                billNo:
+                  cleanString(
+                    body.billNo
+                  ) ??
+                  existing.billNo,
+
+                billDate:
+                  parseDate(
+                    body.billDate,
+                    existing.billDate
+                  ),
+
+                dueDate:
+                  body.dueDate
+                    ? parseDate(
+                        body.dueDate
+                      )
+                    : null,
+
+                subtotal,
+                discount,
+                tax,
+                total,
+
+                balance:
+                  total -
+                  Number(existing.paid),
+
+                notes:
+                  cleanString(
+                    body.notes
+                  ),
+              },
+            }
+          );
+
+          /*
+           * Recreate lines.
+           */
+
+          for (const line of lines) {
+            let batch;
+
+            if (line.batchId) {
+              batch =
+                await tx.inventoryBatch.findFirst(
+                  {
+                    where: {
+                      id:
+                        line.batchId,
+
+                      companyId:
+                        company.id,
+
+                      productId:
+                        line.productId,
+                    },
+                  }
+                );
+
+              if (!batch) {
+                throw new Error(
+                  "Selected batch not found"
+                );
+              }
+
+              if (
+                Number(
+                  batch.unitCost
+                ) !==
+                Number(
+                  line.unitCost
+                )
+              ) {
+                throw new Error(
+                  `Batch ${batch.batchNumber} has a different cost`
+                );
+              }
+            } else {
+              let batchNumber =
+                cleanString(
+                  line.batchNumber
+                ) ??
+                generateBatchNumber();
+
+              let existingBatch =
+                await tx.inventoryBatch.findFirst(
+                  {
+                    where: {
+                      companyId:
+                        company.id,
+
+                      productId:
+                        line.productId,
+
+                      batchNumber,
+                    },
+                  }
+                );
+
+              while (existingBatch) {
+                batchNumber =
+                  generateBatchNumber();
+
+                existingBatch =
+                  await tx.inventoryBatch.findFirst(
+                    {
+                      where: {
+                        companyId:
+                          company.id,
+
+                        productId:
+                          line.productId,
+
+                        batchNumber,
+                      },
+                    }
+                  );
+              }
+
+              batch =
+                await tx.inventoryBatch.create(
+                  {
+                    data: {
+                      companyId:
+                        company.id,
+
+                      productId:
+                        line.productId,
+
+                      batchNumber,
+
+                      purchasebillId: String(body.id),
+
+                      supplierId:
+                        supplier.id,
+
+                      purchaseDate:
+                        parseDate(
+                          body.billDate
+                        ),
+
+                      unitCost:
+                        line.unitCost,
+
+                      originalQuantity:
+                        line.quantity,
+
+                      isActive: true,
+                    },
+                  }
+                );
+            }
+
+            await tx.purchaseBillLine.create(
+              {
+                data: {
+                 billId: String(body.id),
+
+                  productId:
+                    line.productId,
+
+                  batchId:
+                    batch.id,
+
+                  description:
+                    cleanString(
+                      line.description
+                    ),
+
+                  quantity:
+                    line.quantity,
+
+                  unitCost:
+                    line.unitCost,
+
+                  discount:
+                    line.discount,
+
+                  tax:
+                    line.tax,
+
+                  total:
+                    line.total,
+
+                  warehouseId:
+                    line.warehouseId,
+                },
+              }
+            );
+          }
+
+          return tx.purchaseBill.findUnique(
+            {
+              where: {
+                id: body.id,
+              },
+
+              include: {
+                supplier: true,
+
+                lines: {
+                  include: {
+                    product: true,
+                    batch: true,
+                    warehouse: true,
+                  },
+                },
+              },
+            }
+          );
+        }
+      );
+
+    return NextResponse.json({
+      ok: true,
+      bill: updated,
+    });
+  } catch (error) {
+    console.error(
+      "PUT /api/purchases/bills error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update purchase bill",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+/* ============================================================
+   DELETE
+   ============================================================ */
+
+export async function DELETE(
+  request: NextRequest
+) {
+  try {
+    const { searchParams } =
+      new URL(request.url);
+
+    const id =
+      searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Purchase bill ID is required",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const bill =
+      await prisma.purchaseBill.findUnique(
+        {
+          where: {
+            id,
+          },
+
+          include: {
+            allocations: true,
+            lines: true,
+          },
+        }
+      );
+
+    if (!bill) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Purchase bill not found",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * PROTECT POSTED BILLS
+     * --------------------------------------------------------
+     *
+     * A posted bill may already have:
+     *
+     * - stock
+     * - batches
+     * - inventory movements
+     * - supplier payable
+     * - journal entries
+     *
+     * Therefore it cannot simply be deleted.
+     */
+
+    if (
+      bill.status === "POSTED" ||
+      bill.status === "PARTIAL" ||
+      bill.status === "PAID"
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Posted purchase bills cannot be deleted. Reverse the purchase first.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    if (bill.allocations.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "This purchase bill has payments allocated to it and cannot be deleted.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    await prisma.$transaction(
+      async (tx) => {
+        /*
+         * Draft lines cascade from the bill.
+         */
+
+        await tx.purchaseBill.delete({
+          where: {
+            id,
+          },
+        });
+
+        /*
+         * Remove batches that were created specifically
+         * by this draft purchase and have never been used.
+         */
+
+        await tx.inventoryBatch.deleteMany({
+          where: {
+            purchaseBillId: id,
+
+            stockBatches: {
+              none: {
+                quantity: {
+                  gt: 0,
+                },
+              },
+            },
+
+            salesLines: {
+              none: {},
+            },
+          },
+        });
+      }
+    );
+
+    return NextResponse.json({
+      ok: true,
+      message:
+        "Purchase bill deleted successfully",
+    });
+  } catch (error) {
+    console.error(
+      "DELETE /api/purchases/bills error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete purchase bill",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+

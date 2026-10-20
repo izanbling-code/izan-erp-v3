@@ -1,0 +1,774 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+type JournalRow = {
+  accountId: string;
+  description: string | null;
+  debit: string;
+  credit: string;
+};
+
+function cleanString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const valueClean = value.trim();
+  return valueClean.length > 0 ? valueClean : null;
+}
+
+function amountString(value: unknown): string {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : "0";
+  }
+
+  if (typeof value !== "string") return "0";
+
+  const cleaned = value.trim();
+  return cleaned || "0";
+}
+
+function isValidAmount(value: string) {
+  return /^\d+(\.\d{1,2})?$/.test(value) && Number(value) >= 0;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unexpected error.";
+}
+
+async function getCompany() {
+  return prisma.company.findFirst({
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+}
+
+async function nextEntryNumber(companyId: string): Promise<string> {
+  const latest = await prisma.journalEntry.findFirst({
+    where: {
+      companyId,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      entryNumber: true,
+    },
+  });
+
+  const match = latest?.entryNumber?.match(/(\d+)$/);
+
+  if (!match) return "JE-000001";
+
+  return `JE-${String(Number(match[1]) + 1).padStart(6, "0")}`;
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const company = await getCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+
+    const search = cleanString(searchParams.get("search"));
+    const status = cleanString(searchParams.get("status"));
+    const accountId = cleanString(searchParams.get("accountId"));
+
+    const entries = await prisma.journalEntry.findMany({
+      where: {
+        companyId: company.id,
+
+        ...(status && ["DRAFT", "POSTED", "VOID"].includes(status)
+          ? {
+              status: status as "DRAFT" | "POSTED" | "VOID",
+            }
+          : {}),
+
+        ...(accountId
+          ? {
+              lines: {
+                some: {
+                  accountId,
+                },
+              },
+            }
+          : {}),
+
+        ...(search
+          ? {
+              OR: [
+                {
+                  entryNumber: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  reference: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  description: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+
+      orderBy: {
+        entryDate: "desc",
+      },
+
+      include: {
+        lines: {
+          include: {
+            account: true,
+          },
+          orderBy: {
+            id: "asc",
+          },
+        },
+      },
+    });
+
+    const accounts = await prisma.account.findMany({
+      where: {
+        companyId: company.id,
+        isActive: true,
+      },
+      orderBy: [
+        {
+          code: "asc",
+        },
+        {
+          name: "asc",
+        },
+      ],
+    });
+
+    return NextResponse.json({
+      ok: true,
+      entries,
+      accounts,
+    });
+  } catch (error) {
+    console.error("GET /api/accounting/journals error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: errorMessage(error),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    const company = await getCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const entryDateValue = cleanString(body.entryDate);
+
+    if (!entryDateValue) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Entry date is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const entryDate = new Date(entryDateValue);
+
+    if (Number.isNaN(entryDate.getTime())) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Invalid entry date.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const rawRows: unknown[] = Array.isArray(body.lines)
+      ? body.lines
+      : [];
+
+    if (rawRows.length < 2) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "A journal entry requires at least two lines.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const lines: JournalRow[] = rawRows.map((raw) => {
+      const row =
+        typeof raw === "object" && raw !== null
+          ? (raw as Record<string, unknown>)
+          : {};
+
+      return {
+        accountId: cleanString(row.accountId) ?? "",
+        description: cleanString(row.description),
+        debit: amountString(row.debit),
+        credit: amountString(row.credit),
+      };
+    });
+
+    for (const line of lines) {
+      if (!line.accountId) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Every journal line must have an account.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!isValidAmount(line.debit) || !isValidAmount(line.credit)) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Debit and credit amounts must be valid numbers.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (Number(line.debit) > 0 && Number(line.credit) > 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "A journal line cannot contain both debit and credit.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (Number(line.debit) === 0 && Number(line.credit) === 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Every journal line must contain a debit or credit amount.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const accountIds = [
+      ...new Set(lines.map((line) => line.accountId)),
+    ];
+
+    const accounts = await prisma.account.findMany({
+      where: {
+        companyId: company.id,
+        id: {
+          in: accountIds,
+        },
+        isActive: true,
+      },
+    });
+
+    if (accounts.length !== accountIds.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "One or more selected accounts are invalid.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const totalDebit = lines.reduce(
+      (sum, line) => sum + Number(line.debit),
+      0
+    );
+
+    const totalCredit = lines.reduce(
+      (sum, line) => sum + Number(line.credit),
+      0
+    );
+
+    const requestedStatus =
+      body.status === "POSTED" ? "POSTED" : "DRAFT";
+
+    if (
+      requestedStatus === "POSTED" &&
+      Math.abs(totalDebit - totalCredit) > 0.005
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Journal entry is not balanced. Debit: ${totalDebit.toFixed(
+            2
+          )}, Credit: ${totalCredit.toFixed(2)}.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const entryNumber = await nextEntryNumber(company.id);
+
+    const journalEntry = await prisma.journalEntry.create({
+      data: {
+        companyId: company.id,
+        entryNumber,
+        entryDate,
+        reference: cleanString(body.reference),
+        description: cleanString(body.description),
+        status: requestedStatus,
+        lines: {
+          create: lines.map((line) => ({
+            accountId: line.accountId,
+            description: line.description,
+            debit: line.debit,
+            credit: line.credit,
+          })),
+        },
+      },
+
+      include: {
+        lines: {
+          include: {
+            account: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        message:
+          requestedStatus === "POSTED"
+            ? "Journal entry posted successfully."
+            : "Journal entry saved as draft.",
+        entry: journalEntry,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("POST /api/accounting/journals error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: errorMessage(error),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    const company = await getCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const id = cleanString(body.id);
+    const action = cleanString(body.action);
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Journal entry id is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const entry = await prisma.journalEntry.findFirst({
+      where: {
+        id,
+        companyId: company.id,
+      },
+      include: {
+        lines: true,
+      },
+    });
+
+    if (!entry) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Journal entry not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (action === "POST") {
+      if (entry.status !== "DRAFT") {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Only draft journal entries can be posted.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const totalDebit = entry.lines.reduce(
+        (sum, line) => sum + Number(line.debit),
+        0
+      );
+
+      const totalCredit = entry.lines.reduce(
+        (sum, line) => sum + Number(line.credit),
+        0
+      );
+
+      if (Math.abs(totalDebit - totalCredit) > 0.005) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Journal entry is not balanced. Debit: ${totalDebit.toFixed(
+              2
+            )}, Credit: ${totalCredit.toFixed(2)}.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const updated = await prisma.journalEntry.update({
+        where: {
+          id: entry.id,
+        },
+        data: {
+          status: "POSTED",
+        },
+        include: {
+          lines: {
+            include: {
+              account: true,
+            },
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        message: "Journal entry posted successfully.",
+        entry: updated,
+      });
+    }
+
+    if (action === "EDIT") {
+      if (entry.status !== "DRAFT") {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Only draft journal entries can be edited.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const entryDateValue = cleanString(body.entryDate);
+
+      if (!entryDateValue) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Entry date is required.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const entryDate = new Date(entryDateValue);
+
+      if (Number.isNaN(entryDate.getTime())) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Invalid entry date.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const rawRows: unknown[] = Array.isArray(body.lines)
+        ? body.lines
+        : [];
+
+      if (rawRows.length < 2) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "A journal entry requires at least two lines.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const lines: JournalRow[] = rawRows.map((raw) => {
+        const row =
+          typeof raw === "object" && raw !== null
+            ? (raw as Record<string, unknown>)
+            : {};
+
+        return {
+          accountId: cleanString(row.accountId) ?? "",
+          description: cleanString(row.description),
+          debit: amountString(row.debit),
+          credit: amountString(row.credit),
+        };
+      });
+
+      for (const line of lines) {
+        if (!line.accountId) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: "Every journal line must have an account.",
+            },
+            { status: 400 }
+          );
+        }
+
+        if (!isValidAmount(line.debit) || !isValidAmount(line.credit)) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: "Debit and credit amounts must be valid numbers.",
+            },
+            { status: 400 }
+          );
+        }
+
+        if (Number(line.debit) > 0 && Number(line.credit) > 0) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: "A journal line cannot contain both debit and credit.",
+            },
+            { status: 400 }
+          );
+        }
+
+        if (Number(line.debit) === 0 && Number(line.credit) === 0) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: "Every journal line must contain a debit or credit amount.",
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      const accountIds = [
+        ...new Set(lines.map((line) => line.accountId)),
+      ];
+
+      const accounts = await prisma.account.findMany({
+        where: {
+          companyId: company.id,
+          id: {
+            in: accountIds,
+          },
+          isActive: true,
+        },
+      });
+
+      if (accounts.length !== accountIds.length) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "One or more selected accounts are invalid.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.journalLine.deleteMany({
+          where: {
+            journalEntryId: entry.id,
+          },
+        });
+
+        return tx.journalEntry.update({
+          where: {
+            id: entry.id,
+          },
+          data: {
+            entryDate,
+            reference: cleanString(body.reference),
+            description: cleanString(body.description),
+            lines: {
+              create: lines.map((line) => ({
+                accountId: line.accountId,
+                description: line.description,
+                debit: line.debit,
+                credit: line.credit,
+              })),
+            },
+          },
+          include: {
+            lines: {
+              include: {
+                account: true,
+              },
+            },
+          },
+        });
+      });
+
+      return NextResponse.json({
+        ok: true,
+        message: "Draft journal entry updated successfully.",
+        entry: updated,
+      });
+    }
+
+    if (action === "REVERSE") {
+      if (entry.status !== "POSTED") {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Only posted journal entries can be reversed.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const entryNumber = await nextEntryNumber(company.id);
+
+      const reversal = await prisma.journalEntry.create({
+        data: {
+          companyId: company.id,
+          entryNumber,
+          entryDate: new Date(),
+          reference: `REVERSAL OF ${entry.entryNumber}`,
+          description:
+            `Reversal of journal entry ${entry.entryNumber}` +
+            (entry.description ? ` - ${entry.description}` : ""),
+          status: "POSTED",
+          lines: {
+            create: entry.lines.map((line) => ({
+              accountId: line.accountId,
+              description:
+                line.description
+                  ? `Reversal: ${line.description}`
+                  : `Reversal of ${entry.entryNumber}`,
+              debit: line.credit,
+              credit: line.debit,
+            })),
+          },
+        },
+        include: {
+          lines: {
+            include: {
+              account: true,
+            },
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        message: `Journal entry ${entry.entryNumber} reversed successfully.`,
+        entry: reversal,
+      });
+    }
+
+    if (action === "VOID") {
+      if (entry.status !== "POSTED") {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Only posted journal entries can be voided.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const updated = await prisma.journalEntry.update({
+        where: {
+          id: entry.id,
+        },
+        data: {
+          status: "VOID",
+        },
+        include: {
+          lines: {
+            include: {
+              account: true,
+            },
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        message: "Journal entry voided successfully.",
+        entry: updated,
+      });
+    }
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Invalid journal action.",
+      },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("PATCH /api/accounting/journals error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: errorMessage(error),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+

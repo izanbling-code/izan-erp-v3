@@ -1,0 +1,1251 @@
+﻿import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+const movementTypes = [
+  "ADJUSTMENT_IN",
+  "ADJUSTMENT_OUT",
+  "TRANSFER_IN",
+  "TRANSFER_OUT",
+  "OPENING",
+] as const;
+
+type MovementType = (typeof movementTypes)[number];
+
+function isMovementType(value: unknown): value is MovementType {
+  return (
+    typeof value === "string" &&
+    movementTypes.includes(value as MovementType)
+  );
+}
+
+function numberValue(value: unknown): number {
+  const number = Number(value ?? 0);
+
+  return Number.isFinite(number) ? number : 0;
+}
+
+function cleanString(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const result = String(value).trim();
+
+  return result.length > 0 ? result : null;
+}
+
+function parseDate(
+  value: unknown,
+  fallback: Date = new Date()
+): Date {
+  if (!value) {
+    return fallback;
+  }
+
+  const date = new Date(String(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+
+  return date;
+}
+
+function generateBatchNumber(prefix = "ADJ") {
+  const now = new Date();
+
+  const datePart = now
+    .toISOString()
+    .replace(/[-:TZ.]/g, "")
+    .slice(0, 14);
+
+  const randomPart = Math.random()
+    .toString(36)
+    .substring(2, 7)
+    .toUpperCase();
+
+  return `${prefix}-${datePart}-${randomPart}`;
+}
+
+/* ============================================================
+   GET
+   ============================================================ */
+
+export async function GET() {
+  try {
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!company) {
+      throw new Error("No company has been configured yet.");
+    }
+
+    const [movements, products, warehouses, batches] =
+      await Promise.all([
+        /* ----------------------------------------------------
+           MOVEMENTS
+           ---------------------------------------------------- */
+
+        prisma.inventoryMovement.findMany({
+          where: {
+            companyId: company.id,
+          },
+
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+              },
+            },
+
+            batch: {
+              select: {
+                id: true,
+                batchNumber: true,
+                unitCost: true,
+                originalQuantity: true,
+              },
+            },
+
+            sourceWarehouse: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+
+            destinationWarehouse: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+          },
+
+          orderBy: {
+            movementDate: "desc",
+          },
+        }),
+
+        /* ----------------------------------------------------
+           PRODUCTS
+           ---------------------------------------------------- */
+
+        prisma.product.findMany({
+          where: {
+            companyId: company.id,
+            isActive: true,
+            type: "PRODUCT",
+          },
+
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            costPrice: true,
+            reorderLevel: true,
+          },
+
+          orderBy: {
+            name: "asc",
+          },
+        }),
+
+        /* ----------------------------------------------------
+           WAREHOUSES
+           ---------------------------------------------------- */
+
+        prisma.warehouse.findMany({
+          where: {
+            companyId: company.id,
+            isActive: true,
+          },
+
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+
+          orderBy: {
+            name: "asc",
+          },
+        }),
+
+        /* ----------------------------------------------------
+           BATCHES
+           ----------------------------------------------------
+
+           Include warehouse-level batch quantities.
+
+           This allows the frontend to know:
+
+           Batch A
+             Main Warehouse = 10
+             Home Store      = 5
+
+           Batch B
+             Main Warehouse = 8
+        */
+
+        prisma.inventoryBatch.findMany({
+          where: {
+            companyId: company.id,
+            product: {
+              isActive: true,
+              type: "PRODUCT",
+            },
+          },
+
+          select: {
+            id: true,
+            productId: true,
+            batchNumber: true,
+            unitCost: true,
+            originalQuantity: true,
+            purchaseDate: true,
+            isActive: true,
+
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+              },
+            },
+
+            stockBatches: {
+              select: {
+                id: true,
+                warehouseId: true,
+                quantity: true,
+
+                warehouse: {
+                  select: {
+                    id: true,
+                    name: true,
+                    code: true,
+                  },
+                },
+              },
+            },
+          },
+
+          orderBy: {
+            purchaseDate: "asc",
+          },
+        }),
+      ]);
+
+    return NextResponse.json({
+      ok: true,
+      movements,
+      products,
+      warehouses,
+      batches,
+    });
+  } catch (error) {
+    console.error(
+      "GET /api/inventory-movements error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load inventory movements",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/* ============================================================
+   POST
+   ============================================================ */
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    const productId = cleanString(body.productId);
+
+  if (!productId) {
+    throw new Error("Product is required.");
+  }
+    const batchId = cleanString(body.batchId);
+
+    const movementType = cleanString(
+      body.movementType
+    );
+
+    const quantity = numberValue(body.quantity);
+    const requestedUnitCost = numberValue(body.unitCost);
+
+    const sourceWarehouseId = cleanString(
+      body.sourceWarehouseId
+    );
+
+    const destinationWarehouseId = cleanString(
+      body.destinationWarehouseId
+    );
+
+    const notes = cleanString(body.notes);
+
+    /* --------------------------------------------------------
+       BASIC VALIDATION
+       -------------------------------------------------------- */
+
+    if (!productId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!isMovementType(movementType)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Invalid movement type",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Quantity must be greater than zero",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !Number.isFinite(requestedUnitCost) ||
+      requestedUnitCost < 0
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Unit cost cannot be negative",
+        },
+        { status: 400 }
+      );
+    }
+
+    /* --------------------------------------------------------
+       COMPANY
+       -------------------------------------------------------- */
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!company) {
+      throw new Error("No company has been configured yet.");
+    }
+
+    /* --------------------------------------------------------
+       PRODUCT
+       -------------------------------------------------------- */
+
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        companyId: company.id,
+        isActive: true,
+        type: "PRODUCT",
+      },
+    });
+
+    if (!product) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    /* --------------------------------------------------------
+       WAREHOUSE VALIDATION
+       -------------------------------------------------------- */
+
+    if (
+      movementType === "ADJUSTMENT_IN" ||
+      movementType === "OPENING"
+    ) {
+      if (!destinationWarehouseId) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Destination warehouse is required",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (movementType === "ADJUSTMENT_OUT") {
+      if (!sourceWarehouseId) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Source warehouse is required",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (
+      movementType === "TRANSFER_IN" ||
+      movementType === "TRANSFER_OUT"
+    ) {
+      if (
+        !sourceWarehouseId ||
+        !destinationWarehouseId
+      ) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "Source and destination warehouses are required",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
+        sourceWarehouseId ===
+        destinationWarehouseId
+      ) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "Source and destination warehouses must be different",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const warehouseIds = [
+      sourceWarehouseId,
+      destinationWarehouseId,
+    ].filter(Boolean) as string[];
+
+    const warehouses =
+      await prisma.warehouse.findMany({
+        where: {
+          companyId: company.id,
+          id: {
+            in: warehouseIds,
+          },
+          isActive: true,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      });
+
+    if (
+      warehouses.length !==
+      new Set(warehouseIds).size
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "One or more selected warehouses are invalid",
+        },
+        { status: 400 }
+      );
+    }
+
+    /* --------------------------------------------------------
+       DATE
+       -------------------------------------------------------- */
+
+    const movementDate = parseDate(
+      body.movementDate
+    );
+
+    /* --------------------------------------------------------
+       TRANSACTION
+       -------------------------------------------------------- */
+
+    const result = await prisma.$transaction(
+      async (tx) => {
+        /* ====================================================
+           HELPER: GET TOTAL STOCK
+           ==================================================== */
+
+        async function getStock(
+          warehouseId: string
+        ) {
+          return tx.stock.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId,
+                warehouseId,
+              },
+            },
+          });
+        }
+
+        /* ====================================================
+           HELPER: GET BATCH
+           ==================================================== */
+
+        async function getBatch() {
+          if (!batchId) {
+            return null;
+          }
+
+          const batch =
+            await tx.inventoryBatch.findFirst({
+              where: {
+                id: batchId,
+                companyId: company.id,
+                productId,
+              },
+              include: {
+                stockBatches: true,
+              },
+            });
+
+          if (!batch) {
+            throw new Error(
+              "Selected batch was not found for this product."
+            );
+          }
+
+          return batch;
+        }
+
+        /* ====================================================
+           HELPER: CREATE OR GET BATCH
+           ==================================================== */
+
+        async function createOpeningBatch(
+          unitCost: number
+        ) {
+          let batchNumber =
+            cleanString(body.batchNumber) ??
+            generateBatchNumber(
+              movementType === "OPENING"
+                ? "OPEN"
+                : "ADJ"
+            );
+
+          let existing =
+            await tx.inventoryBatch.findFirst({
+              where: {
+                companyId: company.id,
+                productId,
+                batchNumber,
+              },
+            });
+
+          while (existing) {
+            batchNumber = generateBatchNumber(
+              movementType === "OPENING"
+                ? "OPEN"
+                : "ADJ"
+            );
+
+            existing =
+              await tx.inventoryBatch.findFirst({
+                where: {
+                  companyId: company.id,
+                  productId,
+                  batchNumber,
+                },
+              });
+          }
+
+          return tx.inventoryBatch.create({
+            data: {
+              companyId: company.id,
+              productId,
+
+              batchNumber,
+
+              purchaseDate: movementDate,
+
+              unitCost,
+
+              originalQuantity: quantity,
+
+              isActive: true,
+            },
+          });
+        }
+
+        /* ====================================================
+           HELPER: INCREASE BATCH STOCK
+           ==================================================== */
+
+        async function increaseBatchStock(
+          targetBatchId: string,
+          warehouseId: string,
+          qty: number
+        ) {
+          const existing =
+            await tx.stockBatch.findUnique({
+              where: {
+                batchId_warehouseId: {
+                  batchId: targetBatchId,
+                  warehouseId,
+                },
+              },
+            });
+
+          if (existing) {
+            return tx.stockBatch.update({
+              where: {
+                id: existing.id,
+              },
+
+              data: {
+                quantity: {
+                  increment: qty,
+                },
+              },
+            });
+          }
+
+          return tx.stockBatch.create({
+            data: {
+              batchId: targetBatchId,
+              productId,
+              warehouseId,
+              quantity: qty,
+            },
+          });
+        }
+
+        /* ====================================================
+           HELPER: DECREASE BATCH STOCK
+           ==================================================== */
+
+        async function decreaseBatchStock(
+          targetBatchId: string,
+          warehouseId: string,
+          qty: number
+        ) {
+          const stockBatch =
+            await tx.stockBatch.findUnique({
+              where: {
+                batchId_warehouseId: {
+                  batchId: targetBatchId,
+                  warehouseId,
+                },
+              },
+            });
+
+          const available = numberValue(
+            stockBatch?.quantity
+          );
+
+          if (!stockBatch) {
+            throw new Error(
+              "Selected batch has no stock in the selected warehouse."
+            );
+          }
+
+          if (available < qty) {
+            throw new Error(
+              `Insufficient batch stock. Available quantity is ${available}.`
+            );
+          }
+
+          return tx.stockBatch.update({
+            where: {
+              id: stockBatch.id,
+            },
+
+            data: {
+              quantity: {
+                decrement: qty,
+              },
+            },
+          });
+        }
+
+        /* ====================================================
+           HELPER: INCREASE TOTAL STOCK
+           ==================================================== */
+
+        async function increaseTotalStock(
+          warehouseId: string,
+          qty: number,
+          cost: number
+        ) {
+          const stock =
+            await getStock(warehouseId);
+
+          if (!stock) {
+            return tx.stock.create({
+              data: {
+                productId,
+                warehouseId,
+                quantity: qty,
+                averageCost: cost,
+              },
+            });
+          }
+
+          const currentQuantity =
+            numberValue(stock.quantity);
+
+          const currentAverageCost =
+            numberValue(stock.averageCost);
+
+          const newQuantity =
+            currentQuantity + qty;
+
+          const newAverageCost =
+            newQuantity > 0
+              ? (
+                  currentQuantity *
+                    currentAverageCost +
+                  qty * cost
+                ) / newQuantity
+              : cost;
+
+          return tx.stock.update({
+            where: {
+              id: stock.id,
+            },
+
+            data: {
+              quantity: newQuantity,
+              averageCost: newAverageCost,
+            },
+          });
+        }
+
+        /* ====================================================
+           HELPER: DECREASE TOTAL STOCK
+           ==================================================== */
+
+        async function decreaseTotalStock(
+          warehouseId: string,
+          qty: number
+        ) {
+          const stock =
+            await getStock(warehouseId);
+
+          const available = numberValue(
+            stock?.quantity
+          );
+
+          if (!stock) {
+            throw new Error(
+              "Stock record not found for the selected warehouse."
+            );
+          }
+
+          if (available < qty) {
+            throw new Error(
+              `Insufficient stock. Available quantity is ${available}.`
+            );
+          }
+
+          return tx.stock.update({
+            where: {
+              id: stock.id,
+            },
+
+            data: {
+              quantity: {
+                decrement: qty,
+              },
+            },
+          });
+        }
+
+        /* ====================================================
+           ADJUSTMENT IN
+           ==================================================== */
+
+        if (
+          movementType === "ADJUSTMENT_IN"
+        ) {
+          let batch = await getBatch();
+
+          if (!batch) {
+            batch =
+              await createOpeningBatch(
+                requestedUnitCost
+              );
+          } else {
+            if (
+              requestedUnitCost > 0 &&
+              Number(batch.unitCost) !==
+                requestedUnitCost
+            ) {
+              throw new Error(
+                `Batch ${batch.batchNumber} already has a unit cost of ${batch.unitCost}.`
+              );
+            }
+          }
+
+          const actualUnitCost =
+            Number(batch.unitCost);
+
+          await increaseBatchStock(
+            batch.id,
+            destinationWarehouseId!,
+            quantity
+          );
+
+          await increaseTotalStock(
+            destinationWarehouseId!,
+            quantity,
+            actualUnitCost
+          );
+
+          return tx.inventoryMovement.create({
+            data: {
+              companyId: company.id,
+
+              productId,
+
+              batchId: batch.id,
+
+              destinationWarehouseId,
+
+              type: "ADJUSTMENT_IN",
+
+              referenceType: "ADJUSTMENT",
+
+              quantity,
+
+              unitCost: actualUnitCost,
+
+              totalCost:
+                quantity *
+                actualUnitCost,
+
+              movementDate,
+
+              notes,
+            },
+
+            include: {
+              product: true,
+              batch: true,
+          batch: { include: { stockBatches: true } },
+              destinationWarehouse: true,
+            },
+          });
+        }
+
+        /* ====================================================
+           OPENING
+           ==================================================== */
+
+        if (movementType === "OPENING") {
+          let batch = await getBatch();
+
+          if (!batch) {
+            if (
+              requestedUnitCost < 0
+            ) {
+              throw new Error(
+                "Opening cost cannot be negative."
+              );
+            }
+
+            batch =
+              await createOpeningBatch(
+                requestedUnitCost
+              );
+          } else {
+            if (
+              requestedUnitCost > 0 &&
+              Number(batch.unitCost) !==
+                requestedUnitCost
+            ) {
+              throw new Error(
+                `Batch ${batch.batchNumber} already has a different unit cost.`
+              );
+            }
+          }
+
+          const actualUnitCost =
+            Number(batch.unitCost);
+
+          await increaseBatchStock(
+            batch.id,
+            destinationWarehouseId!,
+            quantity
+          );
+
+          await increaseTotalStock(
+            destinationWarehouseId!,
+            quantity,
+            actualUnitCost
+          );
+
+          return tx.inventoryMovement.create({
+            data: {
+              companyId: company.id,
+
+              productId,
+
+              batchId: batch.id,
+
+              destinationWarehouseId,
+
+              type: "OPENING",
+
+              referenceType: "OPENING",
+
+              quantity,
+
+              unitCost: actualUnitCost,
+
+              totalCost:
+                quantity *
+                actualUnitCost,
+
+              movementDate,
+
+              notes,
+            },
+
+            include: {
+              product: true,
+              batch: true,
+          batch: { include: { stockBatches: true } },
+              destinationWarehouse: true,
+            },
+          });
+        }
+
+        /* ====================================================
+           ADJUSTMENT OUT
+           ==================================================== */
+
+        if (
+          movementType ===
+          "ADJUSTMENT_OUT"
+        ) {
+          const batch =
+            await getBatch();
+
+          if (!batch) {
+            throw new Error(
+              "A batch is required for an adjustment out."
+            );
+          }
+
+          const batchStock =
+            batch.stockBatches.find(
+              (item) =>
+                item.warehouseId ===
+                sourceWarehouseId
+            );
+
+          const available =
+            numberValue(
+              batchStock?.quantity
+            );
+
+          if (!batchStock) {
+            throw new Error(
+              "Selected batch has no stock in the selected warehouse."
+            );
+          }
+
+          if (available < quantity) {
+            throw new Error(
+              `Insufficient batch stock. Available quantity is ${available}.`
+            );
+          }
+
+          const actualUnitCost =
+            Number(batch.unitCost);
+
+          await decreaseBatchStock(
+            batch.id,
+            sourceWarehouseId!,
+            quantity
+          );
+
+          await decreaseTotalStock(
+            sourceWarehouseId!,
+            quantity
+          );
+
+          return tx.inventoryMovement.create({
+            data: {
+              companyId: company.id,
+
+              productId,
+
+              batchId: batch.id,
+
+              sourceWarehouseId,
+
+              type: "ADJUSTMENT_OUT",
+
+              referenceType: "ADJUSTMENT",
+
+              quantity,
+
+              unitCost: actualUnitCost,
+
+              totalCost:
+                quantity *
+                actualUnitCost,
+
+              movementDate,
+
+              notes,
+            },
+
+            include: {
+              product: true,
+              batch: true,
+          batch: { include: { stockBatches: true } },
+              sourceWarehouse: true,
+            },
+          });
+        }
+
+        /* ====================================================
+           TRANSFER
+           ==================================================== */
+
+        if (
+          movementType ===
+            "TRANSFER_IN" ||
+          movementType ===
+            "TRANSFER_OUT"
+        ) {
+          const batch =
+            await getBatch();
+
+          if (!batch) {
+            throw new Error(
+              "A batch is required for a warehouse transfer."
+            );
+          }
+
+          const sourceBatchStock =
+            batch.stockBatches.find(
+              (item) =>
+                item.warehouseId ===
+                sourceWarehouseId
+            );
+
+          const available =
+            numberValue(
+              sourceBatchStock?.quantity
+            );
+
+          if (!sourceBatchStock) {
+            throw new Error(
+              "Selected batch has no stock in the source warehouse."
+            );
+          }
+
+          if (available < quantity) {
+            throw new Error(
+              `Insufficient batch stock for transfer. Available quantity is ${available}.`
+            );
+          }
+
+          const transferUnitCost =
+            Number(batch.unitCost);
+
+          /* ----------------------------------------------
+             REMOVE FROM SOURCE
+             ---------------------------------------------- */
+
+          await decreaseBatchStock(
+            batch.id,
+            sourceWarehouseId!,
+            quantity
+          );
+
+          await decreaseTotalStock(
+            sourceWarehouseId!,
+            quantity
+          );
+
+          /* ----------------------------------------------
+             ADD TO DESTINATION
+             ---------------------------------------------- */
+
+          await increaseBatchStock(
+            batch.id,
+            destinationWarehouseId!,
+            quantity
+          );
+
+          await increaseTotalStock(
+            destinationWarehouseId!,
+            quantity,
+            transferUnitCost
+          );
+
+          /* ----------------------------------------------
+             RECORD TRANSFER OUT
+             ---------------------------------------------- */
+
+          await tx.inventoryMovement.create({
+            data: {
+              companyId: company.id,
+
+              productId,
+
+              batchId: batch.id,
+
+              sourceWarehouseId,
+
+              destinationWarehouseId,
+
+              type: "TRANSFER_OUT",
+
+              referenceType: "TRANSFER",
+
+              quantity,
+
+              unitCost:
+                transferUnitCost,
+
+              totalCost:
+                quantity *
+                transferUnitCost,
+
+              movementDate,
+
+              notes,
+            },
+          });
+
+          /* ----------------------------------------------
+             RECORD TRANSFER IN
+             ---------------------------------------------- */
+
+          return tx.inventoryMovement.create({
+            data: {
+              companyId: company.id,
+
+              productId,
+
+              batchId: batch.id,
+
+              sourceWarehouseId,
+
+              destinationWarehouseId,
+
+              type: "TRANSFER_IN",
+
+              referenceType: "TRANSFER",
+
+              quantity,
+
+              unitCost:
+                transferUnitCost,
+
+              totalCost:
+                quantity *
+                transferUnitCost,
+
+              movementDate,
+
+              notes,
+            },
+
+            include: {
+              product: true,
+              batch: true,
+          batch: { include: { stockBatches: true } },
+              sourceWarehouse: true,
+              destinationWarehouse: true,
+            },
+          });
+        }
+
+        throw new Error(
+          "Unsupported inventory movement type."
+        );
+      }
+    );
+
+    return NextResponse.json(
+      {
+        ok: true,
+        movement: result,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error(
+      "POST /api/inventory-movements error:",
+      error
+    );
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to create inventory movement";
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: message,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+

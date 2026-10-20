@@ -1,0 +1,909 @@
+﻿import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
+
+function decimalNumber(value: unknown, fallback = 0) {
+  const number = Number(value ?? fallback);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return number;
+}
+
+export async function GET() {
+  try {
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const [
+      products,
+      categories,
+      brands,
+      units,
+      accounts,
+      warehouses,
+    ] = await Promise.all([
+      prisma.product.findMany({
+        where: {
+          companyId: company.id,
+        },
+        include: {
+          category: true,
+          brand: true,
+          unit: true,
+
+          inventoryAccount: true,
+          salesAccount: true,
+          cogsAccount: true,
+          purchaseAccount: true,
+
+          stock: {
+            select: {
+              quantity: true,
+              averageCost: true,
+            },
+          },
+
+          batches: {
+            orderBy: {
+              purchaseDate: "asc",
+            },
+            include: {
+              stockBatches: {
+                include: {
+                  warehouse: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+
+      prisma.category.findMany({
+        where: {
+          companyId: company.id,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      }),
+
+      prisma.brand.findMany({
+        where: {
+          companyId: company.id,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      }),
+
+      prisma.unit.findMany({
+        where: {
+          companyId: company.id,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      }),
+
+      prisma.account.findMany({
+        where: {
+          companyId: company.id,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+        },
+        orderBy: {
+          code: "asc",
+        },
+      }),
+
+      prisma.warehouse.findMany({
+        where: {
+          companyId: company.id,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      }),
+    ]);
+
+    const normalizedProducts = products.map((product) => ({
+      ...product,
+
+      batches: product.batches.map((batch) => ({
+        ...batch,
+        stock: batch.stockBatches,
+      })),
+    }));
+
+    return NextResponse.json({
+      ok: true,
+      products: normalizedProducts,
+      categories,
+      brands,
+      units,
+      accounts,
+      warehouses,
+    });
+  } catch (error) {
+    console.error("GET /api/products error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to load products",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    if (body.action === "OPENING_STOCK") {
+      return await createOpeningStock(body);
+    }
+
+    const name = String(body.name ?? "").trim();
+    const sku = String(body.sku ?? "").trim();
+
+    if (!name) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product name is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!sku) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "SKU is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const existingProduct =
+      await prisma.product.findFirst({
+        where: {
+          companyId: company.id,
+          sku,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (existingProduct) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `A product with SKU "${sku}" already exists.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        companyId: company.id,
+        name,
+        sku,
+
+        description: body.description
+          ? String(body.description).trim()
+          : null,
+
+        type:
+          body.type === "SERVICE"
+            ? "SERVICE"
+            : "PRODUCT",
+
+        categoryId: body.categoryId
+          ? String(body.categoryId)
+          : null,
+
+        brandId: body.brandId
+          ? String(body.brandId)
+          : null,
+
+        unitId: body.unitId
+          ? String(body.unitId)
+          : null,
+
+        costPrice: decimalNumber(body.costPrice),
+        salePrice: decimalNumber(body.salePrice),
+        reorderLevel: decimalNumber(
+          body.reorderLevel
+        ),
+
+        isActive: body.isActive !== false,
+
+        inventoryAccountId:
+          body.inventoryAccountId
+            ? String(body.inventoryAccountId)
+            : null,
+
+        salesAccountId: body.salesAccountId
+          ? String(body.salesAccountId)
+          : null,
+
+        cogsAccountId: body.cogsAccountId
+          ? String(body.cogsAccountId)
+          : null,
+
+        purchaseAccountId:
+          body.purchaseAccountId
+            ? String(body.purchaseAccountId)
+            : null,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        product,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("POST /api/products error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to create product",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+async function createOpeningStock(body: any) {
+  const productId = String(body.productId ?? "");
+  const warehouseId = String(
+    body.warehouseId ?? ""
+  );
+  const batchNumber = String(
+    body.batchNumber ?? ""
+  ).trim();
+
+  const quantity = decimalNumber(body.quantity);
+  const unitCost = decimalNumber(body.unitCost);
+
+  if (!productId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Product is required.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!warehouseId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Warehouse is required.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!batchNumber) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Batch number is required.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Quantity must be greater than zero.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!Number.isFinite(unitCost) || unitCost < 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Unit cost cannot be negative.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const company = await prisma.company.findFirst({
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+
+  if (!company) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "No company has been configured yet",
+      },
+      { status: 400 }
+    );
+  }
+
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const product = await tx.product.findFirst({
+        where: {
+          id: productId,
+          companyId: company.id,
+        },
+      });
+
+      if (!product) {
+        throw new Error("Product not found.");
+      }
+
+      if (product.type !== "PRODUCT") {
+        throw new Error(
+          "Opening stock can only be added to products, not services."
+        );
+      }
+
+      if (!product.isActive) {
+        throw new Error(
+          "Cannot add opening stock to an inactive product."
+        );
+      }
+
+      const warehouse =
+        await tx.warehouse.findFirst({
+          where: {
+            id: warehouseId,
+            companyId: company.id,
+            isActive: true,
+          },
+        });
+
+      if (!warehouse) {
+        throw new Error(
+          "Selected warehouse was not found or is inactive."
+        );
+      }
+
+      const existingBatch =
+        await tx.inventoryBatch.findFirst({
+          where: {
+            companyId: company.id,
+            productId,
+            batchNumber,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      if (existingBatch) {
+        throw new Error(
+          `Batch "${batchNumber}" already exists for this product.`
+        );
+      }
+
+      const purchaseDate = body.purchaseDate
+        ? new Date(body.purchaseDate)
+        : new Date();
+
+      if (Number.isNaN(purchaseDate.getTime())) {
+        throw new Error(
+          "Invalid opening stock date."
+        );
+      }
+
+      const batch =
+        await tx.inventoryBatch.create({
+          data: {
+            companyId: company.id,
+            productId,
+            batchNumber,
+            purchaseDate,
+            unitCost,
+            originalQuantity: quantity,
+            isActive: true,
+          },
+        });
+
+      await tx.stockBatch.create({
+        data: {
+          batchId: batch.id,
+          productId,
+          warehouseId,
+          quantity,
+        },
+      });
+
+      const existingStock =
+        await tx.stock.findUnique({
+          where: {
+            productId_warehouseId: {
+              productId,
+              warehouseId,
+            },
+          },
+        });
+
+      const oldQuantity = Number(
+        existingStock?.quantity ?? 0
+      );
+
+      const oldAverageCost = Number(
+        existingStock?.averageCost ?? 0
+      );
+
+      const newQuantity =
+        oldQuantity + quantity;
+
+      const newAverageCost =
+        newQuantity > 0
+          ? (oldQuantity * oldAverageCost +
+              quantity * unitCost) /
+            newQuantity
+          : unitCost;
+
+      await tx.stock.upsert({
+        where: {
+          productId_warehouseId: {
+            productId,
+            warehouseId,
+          },
+        },
+        create: {
+          productId,
+          warehouseId,
+          quantity,
+          averageCost: unitCost,
+        },
+        update: {
+          quantity: newQuantity,
+          averageCost: newAverageCost,
+        },
+      });
+
+      const totalCost =
+        quantity * unitCost;
+
+      const movement =
+        await tx.inventoryMovement.create({
+          data: {
+            companyId: company.id,
+            productId,
+            batchId: batch.id,
+            destinationWarehouseId: warehouseId,
+            type: "OPENING",
+            referenceType: "OPENING",
+            referenceId: batch.id,
+            quantity,
+            unitCost,
+            totalCost,
+            movementDate: purchaseDate,
+            notes:
+              "Opening inventory balance",
+          },
+        });
+
+      return {
+        batch,
+        movement,
+      };
+    }
+  );
+
+  return NextResponse.json(
+    {
+      ok: true,
+      batch: result.batch,
+      movement: result.movement,
+    },
+    { status: 201 }
+  );
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    const id = String(body.id ?? "");
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product ID is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const existing =
+      await prisma.product.findFirst({
+        where: {
+          id,
+          companyId: company.id,
+        },
+      });
+
+    if (!existing) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const name = String(
+      body.name ?? existing.name
+    ).trim();
+
+    const sku = String(
+      body.sku ?? existing.sku
+    ).trim();
+
+    if (!name) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product name is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!sku) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "SKU is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const duplicate =
+      await prisma.product.findFirst({
+        where: {
+          companyId: company.id,
+          sku,
+          NOT: {
+            id,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (duplicate) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `A product with SKU "${sku}" already exists.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    const product =
+      await prisma.product.update({
+        where: {
+          id,
+        },
+        data: {
+          name,
+          sku,
+
+          description:
+            body.description === null
+              ? null
+              : String(
+                  body.description ??
+                    existing.description ??
+                    ""
+                ).trim() || null,
+
+          type:
+            body.type === "SERVICE"
+              ? "SERVICE"
+              : "PRODUCT",
+
+          categoryId:
+            body.categoryId
+              ? String(body.categoryId)
+              : null,
+
+          brandId:
+            body.brandId
+              ? String(body.brandId)
+              : null,
+
+          unitId:
+            body.unitId
+              ? String(body.unitId)
+              : null,
+
+          costPrice: decimalNumber(
+            body.costPrice,
+            Number(existing.costPrice)
+          ),
+
+          salePrice: decimalNumber(
+            body.salePrice,
+            Number(existing.salePrice)
+          ),
+
+          reorderLevel: decimalNumber(
+            body.reorderLevel,
+            Number(existing.reorderLevel)
+          ),
+
+          inventoryAccountId:
+            body.inventoryAccountId
+              ? String(body.inventoryAccountId)
+              : null,
+
+          salesAccountId:
+            body.salesAccountId
+              ? String(body.salesAccountId)
+              : null,
+
+          cogsAccountId:
+            body.cogsAccountId
+              ? String(body.cogsAccountId)
+              : null,
+
+          purchaseAccountId:
+            body.purchaseAccountId
+              ? String(body.purchaseAccountId)
+              : null,
+
+          isActive:
+            body.isActive !== false,
+        },
+      });
+
+    return NextResponse.json({
+      ok: true,
+      product,
+    });
+  } catch (error) {
+    console.error("PUT /api/products error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to update product.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest
+) {
+  try {
+    const body = await request.json();
+
+    const id = String(body.id ?? "");
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product ID is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const company = await prisma.company.findFirst({
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No company has been configured yet",
+        },
+        { status: 400 }
+      );
+    }
+
+    const product =
+      await prisma.product.findFirst({
+        where: {
+          id,
+          companyId: company.id,
+        },
+        include: {
+          stock: true,
+          batches: true,
+          salesLines: {
+            select: {
+              id: true,
+            },
+            take: 1,
+          },
+          purchaseLines: {
+            select: {
+              id: true,
+            },
+            take: 1,
+          },
+          inventoryMoves: {
+            select: {
+              id: true,
+            },
+            take: 1,
+          },
+        },
+      });
+
+    if (!product) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Product not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (!body.permanent) {
+      const isActive =
+        body.isActive === true;
+
+      await prisma.product.update({
+        where: {
+          id,
+        },
+        data: {
+          isActive,
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        message: isActive
+          ? "Product activated."
+          : "Product deactivated.",
+      });
+    }
+
+    const hasTransactions =
+      product.salesLines.length > 0 ||
+      product.purchaseLines.length > 0 ||
+      product.inventoryMoves.length > 0;
+
+    const currentStock =
+      product.stock.reduce(
+        (total, row) =>
+          total + Number(row.quantity || 0),
+        0
+      );
+
+    if (
+      hasTransactions ||
+      product.batches.length > 0 ||
+      currentStock !== 0
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "This product cannot be permanently deleted because it has inventory history, batches, stock or transaction records. Deactivate it instead.",
+        },
+        { status: 409 }
+      );
+    }
+
+    await prisma.product.delete({
+      where: {
+        id,
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      message: "Product permanently deleted.",
+    });
+  } catch (error) {
+    console.error(
+      "DELETE /api/products error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "Failed to delete or deactivate product.",
+      },
+      { status: 500 }
+    );
+  }
+}
