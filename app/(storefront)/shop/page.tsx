@@ -105,7 +105,8 @@ export default async function ShopPage({
     : {}) as CSSProperties;
 
   return (
-    <main className="w-full min-h-screen bg-slate-100 flex justify-center" style={themeVars}>
+    // CHANGED: Removed the gray background and flex-center. Now it's a full-width fluid container.
+    <main className="w-full min-h-screen bg-[var(--theme-bg,#ffffff)] overflow-x-hidden relative" style={themeVars}>
       {isPreview && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-teal-500 text-white px-6 py-2 rounded-full font-bold shadow-lg text-sm">
           Preview Mode (Draft)
@@ -116,17 +117,13 @@ export default async function ShopPage({
         <StorefrontFunnelPopup section={funnelSection} quizData={plainQuiz} />
       )}
 
-      {/* 
-        FIXED: We added max-w-[1200px] mx-auto here. 
-        This forces the live site to match the width of your editor!
-      */}
       {hasV2 && (
-        <div className="w-full max-w-[1200px] bg-[var(--theme-bg,#ffffff)] shadow-2xl relative min-h-screen overflow-x-hidden">
+        // CHANGED: Removed max-w-[1200px]. It will now stretch 100% full screen.
+        <div className="w-full relative min-h-screen">
           {inlineSections.map((section: any) => (
             <div 
               key={section.id} 
               style={{ position: "relative" }}
-              // FIXED: Ensures navbar background is solid white
               className={section.type === "navbar" ? "bg-white z-20 relative" : ""}
             >
               <StorefrontSectionRenderer
@@ -144,7 +141,7 @@ export default async function ShopPage({
       )}
 
       {!hasV2 && homePage?.rawHtml?.trim() && (
-        <div className="w-full max-w-[1200px] relative z-10 bg-white">
+        <div className="w-full relative z-10 bg-white">
           <StorefrontTemplate
             html={homePage.rawHtml}
             css={homePage.rawCss}
