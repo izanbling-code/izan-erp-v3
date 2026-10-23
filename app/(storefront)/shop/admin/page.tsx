@@ -8,7 +8,6 @@ export const dynamic = "force-dynamic";
 export default async function ShopAdminOverviewPage() {
   const company = await prisma.company.findFirst();
   
-  // Fetch live stats safely
   const productCount = await prisma.product.count({
     where: { companyId: company?.id, isActive: true }
   }).catch(() => 0);
@@ -24,8 +23,6 @@ export default async function ShopAdminOverviewPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
@@ -38,7 +35,6 @@ export default async function ShopAdminOverviewPage() {
         </Link>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {stats.map((stat) => (
           <Link key={stat.label} href={stat.href} className="group p-6 bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-white/5 hover:border-teal-500/50 dark:hover:border-teal-500/50 transition-all shadow-sm">
@@ -56,7 +52,6 @@ export default async function ShopAdminOverviewPage() {
         ))}
       </div>
 
-      {/* Quick Actions */}
       <div className="pt-6">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

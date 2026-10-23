@@ -204,11 +204,6 @@ export default function PaymentWorkspace({ mode }: { mode: Mode }) {
     loadWorkspaceData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
-  supabase
-          .from("SalesInvoice")
-          .select("id, invoiceNo, customerId, total, paid, balance, invoiceDate, status")
-          .gt("balance", 0)
-          .order("invoiceDate", { ascending: false }),
 
   async function loadWorkspaceData() {
     try {
@@ -2115,8 +2110,4 @@ export default function PaymentWorkspace({ mode }: { mode: Mode }) {
       </ERPShell>
     </>
   );
-}
-
-function loadWorkspaceData() {
-  throw new Error("Function not implemented.");
 }

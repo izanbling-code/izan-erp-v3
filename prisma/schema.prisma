@@ -682,6 +682,7 @@ model CompanySettings {
   accounting    Json?
   general       Json?
   storefront    Json?
+  storefrontDraft Json?
   sales         Json?
   purchases     Json?
   inventory     Json?

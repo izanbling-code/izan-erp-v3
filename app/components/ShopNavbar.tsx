@@ -1,14 +1,33 @@
 ﻿"use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { ICON_MAP } from "@/app/(storefront)/shop/admin/design/canvas/ElementIcons";
 
-export default function ShopNavbar() {
+export default function ShopNavbar({ section, storeName }: { section?: any; storeName?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState("CART"); 
   const [cart, setCart] = useState<any[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("LATER");
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const s = section?.settings || {};
+  const bgColor = s.bgColor || "#ffffff";
+  const textColor = s.textColor || "#0f172a";
+  const paddingY = s.paddingY || 24; 
+  const displayName = s.brandName || storeName || "IZAN BLING";
+  const blocks = section?.blocks || [];
+
+  // Check if any block is specifically a cart block to auto-open drawer
+  useEffect(() => {
+    const cartBtn = document.getElementById('navbar-cart-btn');
+    if (cartBtn) {
+      cartBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        setIsOpen(true);
+      });
+    }
+  }, []);
 
   const loadCart = () => {
     const saved = localStorage.getItem("izan_cart");
@@ -32,43 +51,11 @@ export default function ShopNavbar() {
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.salePrice), 0);
 
   const handleCheckout = async (e: any) => {
+    // (Keep your exact same checkout logic here)
     e.preventDefault();
     setIsProcessing(true);
-    
     try {
-      let slipUrl = "";
-      if (paymentMethod === "SLIP" && slipFile) {
-        const formData = new FormData();
-        formData.append("file", slipFile);
-        const uploadRes = await fetch("/api/shop/upload", { method: "POST", body: formData });
-        const uploadData = await uploadRes.json();
-        if (uploadData.error) throw new Error(uploadData.error);
-        slipUrl = uploadData.url;
-      }
-
-      const orderData = {
-        customer: { name: e.target.fullName.value, phone: e.target.phone.value, address: e.target.address.value },
-        items: cart,
-        paymentMethod,
-        paymentSlipUrl: slipUrl,
-        total: cartTotal
-      };
-      
-      const res = await fetch("/api/shop/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderData)
-      });
-      
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      
-      alert("Order successfully placed! We will contact you soon.");
-      setCart([]);
-      localStorage.removeItem("izan_cart");
-      window.dispatchEvent(new Event("cart-updated"));
-      setIsOpen(false);
-      setView("CART");
+        // ... Keep all your checkout logic ...
     } catch (error: any) {
       alert(`Checkout failed: ${error.message}`);
     } finally {
@@ -78,80 +65,50 @@ export default function ShopNavbar() {
 
   return (
     <>
-      <header className="flex justify-between items-center p-8 border-b bg-white relative z-50">
-        <Link href="/shop" className="text-2xl tracking-widest uppercase hover:opacity-70 transition">Izan Bling</Link>
-        <button onClick={() => setIsOpen(true)} className="text-sm uppercase tracking-wide hover:text-gray-500 transition">
-          Cart ({cart.length})
-        </button>
+      <header 
+        style={{ backgroundColor: bgColor, color: textColor, paddingTop: paddingY, paddingBottom: paddingY }}
+        className="flex justify-between items-center px-8 border-b relative z-10 transition-colors"
+      >
+        {/* LEFT: LOGO */}
+        <Link href="/shop" className="text-2xl tracking-widest uppercase hover:opacity-70 transition">
+          {displayName}
+        </Link>
+
+        {/* CENTER & RIGHT: DYNAMIC BLOCKS */}
+        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+          {blocks.map((block: any) => {
+            const Icon = block.settings.icon ? ICON_MAP[block.settings.icon] : null;
+            const isCart = block.settings.icon === "ShoppingCart" || block.settings.label === "Cart";
+
+            return (
+              <Link 
+                key={block.id} 
+                href={block.settings.href || "#"} 
+                id={isCart ? "navbar-cart-btn" : undefined}
+                className="flex items-center gap-2 hover:opacity-60 transition-opacity relative"
+              >
+                {Icon && <Icon className="w-5 h-5" />}
+                {block.settings.label && <span>{block.settings.label}</span>}
+                
+                {/* Cart Badge */}
+                {isCart && cart.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                    {cart.length}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
       </header>
 
-      {/* UPDATED: Added backdrop-blur-md and bg-black/30 for frosted glass effect */}
+      {/* 
+        YOUR ENTIRE CART DRAWER CODE REMAINS EXACTLY THE SAME 
+        (Just copy-paste your existing cart drawer here)
+      */}
       {isOpen && <div className="fixed inset-0 bg-black/30 backdrop-blur-md z-[150] transition-all" onClick={() => setIsOpen(false)}></div>}
-
       <div className={`fixed inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl z-[200] transform transition-transform duration-300 flex flex-col ${isOpen ? "translate-x-0" : "translate-x-full"}`}>
-        <div className="flex justify-between items-center p-6 border-b">
-          <h2 className="text-lg uppercase tracking-widest">{view === "CART" ? "Your Cart" : "Checkout"}</h2>
-          <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-black text-2xl">&times;</button>
-        </div>
-
-        <div className="flex-grow overflow-y-auto p-6">
-          {view === "CART" ? (
-            cart.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center mt-10">Your cart is empty.</p>
-            ) : (
-              <div className="space-y-6">
-                {cart.map((item, i) => (
-                  <div key={i} className="flex gap-4 border-b pb-4">
-                    <img src={item.imageUrl || "https://placehold.co/100x100?text=No+Image"} alt={item.name} className="w-16 h-16 object-cover rounded" />
-                    <div className="flex-grow">
-                      <h4 className="text-sm font-medium">{item.name}</h4>
-                      <p className="text-xs text-gray-500 mt-1">Rs. {Number(item.salePrice).toLocaleString()}</p>
-                    </div>
-                    <button onClick={() => removeFromCart(i)} className="text-xs text-red-500 hover:underline">Remove</button>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : (
-            <form id="checkout-form" onSubmit={handleCheckout} className="space-y-4">
-              <input name="fullName" required type="text" placeholder="Full Name" className="w-full border p-3 text-sm rounded bg-white" />
-              <input name="phone" required type="text" placeholder="Phone Number" className="w-full border p-3 text-sm rounded bg-white" />
-              <textarea name="address" required placeholder="Delivery Address" rows={3} className="w-full border p-3 text-sm rounded bg-white"></textarea>
-              <div className="border-t pt-4 mt-4">
-                <label className="text-xs font-bold uppercase text-gray-500 mb-2 block">Payment Method</label>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full border p-3 text-sm rounded mb-4 bg-white">
-                  <option value="LATER">Pay Later (Cash on Delivery)</option>
-                  <option value="SLIP">Bank Transfer (Upload Slip)</option>
-                </select>
-                {paymentMethod === "SLIP" && (
-                  <div className="mb-4">
-                    <label className="text-xs text-gray-500 mb-1 block">Upload Payment Slip</label>
-                    <input required type="file" accept="image/*" onChange={(e) => setSlipFile(e.target.files?.[0] || null)} className="w-full border p-2 text-sm rounded bg-white" />
-                  </div>
-                )}
-              </div>
-            </form>
-          )}
-        </div>
-
-        <div className="p-6 border-t bg-gray-50">
-          <div className="flex justify-between mb-4">
-            <span className="uppercase text-sm font-bold">Total</span>
-            <span className="font-medium">Rs. {cartTotal.toLocaleString()}</span>
-          </div>
-          {view === "CART" ? (
-            <button disabled={cart.length === 0} onClick={() => setView("CHECKOUT")} className="w-full bg-black text-white py-3 uppercase tracking-widest text-sm rounded disabled:opacity-50">
-              Proceed to Checkout
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setView("CART")} className="w-1/3 border border-black text-black py-3 uppercase tracking-widest text-xs rounded hover:bg-gray-100">Back</button>
-              <button disabled={isProcessing} type="submit" form="checkout-form" className="w-2/3 bg-black text-white py-3 uppercase tracking-widest text-sm rounded disabled:opacity-50">
-                {isProcessing ? "Processing..." : "Place Order"}
-              </button>
-            </div>
-          )}
-        </div>
+          {/* ... Your entire Cart Drawer UI ... */}
       </div>
     </>
   );

@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useERPConfig } from "@/app/contexts/SettingsContext";
+import { supabase } from "@/app/lib/supabase";
 import { ShoppingCart, Package, Users, FileText, TrendingUp, AlertCircle } from "lucide-react";
+import JarvisChat from "../../../components/JarvisChat";
 
 export default function DashboardPage() {
   const { config: appearance } = useERPConfig("appearance");
@@ -12,15 +14,95 @@ export default function DashboardPage() {
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/dashboard/metric")
-      .then(res => res.json())
-      .then(json => {
-        if (json.ok) setData(json.data);
+    async function loadData() {
+      try {
+        // 1. Get Company ID
+        const { data: company } = await supabase.from("Company").select("id").limit(1).single();
+        if (!company) throw new Error("Company not found");
+
+        // 2. Fetch all necessary tables in parallel
+        const [productsRes, ordersRes, invoicesRes, purchasesRes] = await Promise.all([
+          supabase.from("Product").select("*").eq("companyId", company.id),
+          supabase.from("Order").select("*").eq("companyId", company.id),
+          supabase.from("SalesInvoice").select("*").eq("companyId", company.id),
+          supabase.from("PurchaseBill").select("*").eq("companyId", company.id),
+        ]);
+
+        const products = productsRes.data || [];
+        const orders = ordersRes.data || [];
+        const invoices = invoicesRes.data || [];
+        const purchases = purchasesRes.data || [];
+
+        // 3. Calculate KPIs
+        const today = new Date().toISOString().split("T")[0];
+        const thisMonth = new Date().getMonth();
+        
+        const ordersToday = orders.filter(o => o.createdAt?.startsWith(today)).length;
+        const pendingOrders = orders.filter(o => o.status === "SALE_ORDER" || o.status === "PENDING").length;
+        
+        const inventoryValue = products.reduce((sum, p) => sum + (Number(p.costPrice) * Number(p.reorderLevel || 1)), 0); // Simplified
+        const lowStockItems = products.filter(p => Number(p.reorderLevel) > 0 && Number(p.reorderLevel) < 5).length;
+        
+        const receivables = invoices.reduce((sum, i) => sum + (Number(i.balance) || 0), 0);
+        const overdue = invoices.filter(i => i.status !== "PAID" && new Date(i.dueDate) < new Date()).reduce((sum, i) => sum + Number(i.balance), 0);
+        
+        const openPOs = purchases.filter(p => p.status === "DRAFT" || p.status === "POSTED").length;
+        const poValue = purchases.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
+        
+        const salesThisMonth = invoices
+          .filter(i => new Date(i.invoiceDate).getMonth() === thisMonth)
+          .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+
+        // 4. Dummy Chart Data
+        const salesChart = [1200, 1900, 3000, 5000, 2000, 3000, 4000, 2500, 6000, 7000, 4000, 8000];
+        const ordersChart = [20, 35, 45, 60, 30, 50, 55, 40, 70, 80, 50, 90];
+
+        // 5. Set Data
+        setData({
+          kpis: {
+            ordersToday,
+            pendingOrders,
+            inventoryValue,
+            lowStockItems,
+            receivables,
+            overdue,
+            openPOs,
+            poValue,
+            salesThisMonth,
+            salesGrowth: 0
+          },
+          charts: {
+            salesVsOrders: {
+              sales: salesChart,
+              orders: ordersChart,
+              labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            },
+            warehouse: {
+              total: products.length,
+              available: products.length,
+              reserved: 0,
+              incoming: 0
+            }
+          },
+          activity: [
+            { title: "Dashboard synced directly from Supabase", time: "Just now" },
+            { title: "System online", time: "1 min ago" }
+          ],
+          categories: [
+            { label: "General", value: salesThisMonth }
+          ]
+        });
+
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      }
+    }
+    loadData();
   }, []);
 
   const generateChartPath = (dataPoints: number[], width: number, height: number, maxVal: number) => {
@@ -44,12 +126,12 @@ export default function DashboardPage() {
     );
   }
 
-  if (!data) {
+  if (error || !data) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center text-slate-500">
         <AlertCircle className="w-12 h-12 mb-4 opacity-50" />
         <h2 className="text-xl font-bold">Failed to load metrics</h2>
-        <p className="text-sm mt-1">Check your database connection.</p>
+        <p className="text-sm mt-1">{error || "Check your database connection."}</p>
       </div>
     );
   }
@@ -93,11 +175,8 @@ export default function DashboardPage() {
             </div>
             <div className="flex-1 w-full min-h-[220px] relative mt-2">
               <svg viewBox={`0 0 ${chartWidth} ${chartHeight + 40}`} className="w-full h-full ml-4 preserve-aspect-ratio-none overflow-visible">
-                {/* Sales Line - Teal */}
                 <path d={salesPath} fill="none" stroke="#14b8a6" strokeWidth="4" className="drop-shadow-[0_4px_6px_rgba(20,184,166,0.2)]" strokeLinecap="round" strokeLinejoin="round" />
-                {/* Orders Line - Cyan */}
                 <path d={ordersPath} fill="none" stroke="#06b6d4" strokeWidth="4" className="drop-shadow-[0_4px_6px_rgba(6,182,212,0.2)]" strokeLinecap="round" strokeLinejoin="round" />
-                {/* Gradients */}
                 <path d={`${salesPath} L ${chartWidth},${chartHeight} L 0,${chartHeight} Z`} fill="url(#teal-gradient)" opacity="0.15" />
                 <path d={`${ordersPath} L ${chartWidth},${chartHeight} L 0,${chartHeight} Z`} fill="url(#cyan-gradient)" opacity="0.1" />
                 <defs>
@@ -143,7 +222,6 @@ export default function DashboardPage() {
             <h3 className="font-bold text-slate-900 dark:text-white mb-6">Recent System Activity</h3>
             <div className="space-y-6">
               {data.activity.map((act: any, i: number) => {
-                // Remap legacy random colors to the new Glass palette based on index
                 const glassColors = ["bg-teal-500", "bg-cyan-500", "bg-emerald-500", "bg-slate-400 dark:bg-zinc-500"];
                 const dotColor = glassColors[i % glassColors.length];
                 return (
@@ -165,7 +243,6 @@ export default function DashboardPage() {
             <h3 className="font-bold text-slate-900 dark:text-white mb-6">Top Product Categories (Sales Value)</h3>
             <div className="space-y-5">
               {data.categories.map((cat: any, i: number) => {
-                // Refined Glass Palette for bars
                 const colors = ["bg-teal-500", "bg-emerald-500", "bg-cyan-500", "bg-slate-300 dark:bg-zinc-600"];
                 const width = `${Math.min((cat.value / catMax) * 100, 100)}%`;
                 return (
@@ -184,6 +261,10 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* ✅ 2. ADD THIS COMPONENT HERE */}
+      <JarvisChat />
+
     </div>
   );
 }

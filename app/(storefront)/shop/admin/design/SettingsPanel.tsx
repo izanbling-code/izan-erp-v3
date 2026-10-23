@@ -1,9 +1,10 @@
 "use client";
 
 import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
 import type { SectionConfig, SectionSchema, SettingField, BlockConfig } from "./types";
-import { uid } from "./registry";
+import { uid, FONT_LIBRARY } from "./registry";
+import ImageUpload from "@/components/ImageUpload";
+import { ICON_NAMES } from "./canvas/ElementIcons";
 
 interface Props {
   section: SectionConfig;
@@ -68,20 +69,18 @@ export default function SettingsPanel({
               const isOpen = selectedBlockId === block.id;
               return (
                 <div key={block.id} className="border border-white/10 rounded-lg overflow-hidden">
-                  {/* Outer button for selecting the block */}
                   <button
                     onClick={() => onSelectBlock(isOpen ? null : block.id)}
                     className="w-full flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 transition text-xs font-medium"
                   >
                     {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                     <span className="flex-1 text-left truncate">
-                      {block.settings.title || block.settings.heading || block.settings.author || `Block ${idx + 1}`}
+                      {block.settings.label || block.settings.title || block.settings.heading || `Block ${idx + 1}`}
                     </span>
                     
-                    {/* Inner div for the delete action (prevents invalid nested button HTML) */}
                     <div
                       onClick={(e) => {
-                        e.stopPropagation(); // Stops the outer button from triggering
+                        e.stopPropagation(); 
                         onBlocksChange(section.blocks.filter((b) => b.id !== block.id));
                       }}
                       className="p-1 hover:bg-rose-500/20 text-rose-400 rounded cursor-pointer"
@@ -150,17 +149,6 @@ function FieldRenderer({
         </div>
       );
     case "textarea":
-      return (
-        <div>
-          {label}
-          <textarea
-            value={v ?? ""}
-            onChange={(e) => onChange(e.target.value)}
-            rows={3}
-            className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-500/60 outline-none resize-none"
-          />
-        </div>
-      );
     case "richtext":
       return (
         <div>
@@ -168,7 +156,7 @@ function FieldRenderer({
           <textarea
             value={v ?? ""}
             onChange={(e) => onChange(e.target.value)}
-            rows={5}
+            rows={4}
             className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-500/60 outline-none resize-none"
           />
         </div>
@@ -193,7 +181,6 @@ function FieldRenderer({
           </div>
         </div>
       );
-      
     case "number":
       return (
         <div>
@@ -209,7 +196,6 @@ function FieldRenderer({
           />
         </div>
       );
-
     case "range":
       return (
         <div>
@@ -228,7 +214,6 @@ function FieldRenderer({
           </div>
         </div>
       );
-      
     case "select":
       return (
         <div>
@@ -248,16 +233,11 @@ function FieldRenderer({
       );
     case "image":
       return (
-        <div>
-          {label}
-          <input
-            type="text"
-            placeholder="https://..."
-            value={v ?? ""}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-500/60 outline-none"
-          />
-        </div>
+        <ImageUpload
+          label={field.label}
+          value={v ?? ""}
+          onChange={(url) => onChange(url)}
+        />
       );
     case "url":
       return (
@@ -307,6 +287,54 @@ function FieldRenderer({
               </button>
             ))}
           </div>
+        </div>
+      );
+    case "font":
+      return (
+        <div>
+          {label}
+          <select
+            value={v ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-500/60 outline-none"
+          >
+            <option value="">Default (Theme)</option>
+            {FONT_LIBRARY.map((f) => (
+              <option key={f.value} value={f.value}>{f.family}</option>
+            ))}
+          </select>
+        </div>
+      );
+    case "animation":
+      return (
+        <div>
+          {label}
+          <select
+            value={v ?? "none"}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-500/60 outline-none"
+          >
+            <option value="none">None</option>
+            <option value="hover-zoom">Image Zoom</option>
+            <option value="hover-lift">Card Lift</option>
+            <option value="hover-fade">Fade Reveal</option>
+          </select>
+        </div>
+      );
+    case "icon":
+      return (
+        <div>
+          {label}
+          <select
+            value={v ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-500/60 outline-none"
+          >
+            <option value="">None</option>
+            {ICON_NAMES.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
         </div>
       );
     default:

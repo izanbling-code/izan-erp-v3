@@ -37,6 +37,49 @@ export interface BlockConfig {
   settings: Record<string, any>;
 }
 
+export interface ElementFrame {
+  x: number; y: number; width: number; height: number;
+  rotation: number; zIndex: number;
+}
+
+export interface ElementBreakpointOverride {
+  x?: number; y?: number; width?: number; height?: number;
+}
+
+export interface ElementStyle {
+  color?: string;
+  background?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  borderRadius?: number;
+  opacity?: number;
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: number | string;
+  letterSpacing?: number;
+  lineHeight?: number;
+  textAlign?: "left" | "center" | "right";
+  padding?: number;
+  boxShadow?: string;
+}
+
+export type ElementType =
+  | "text" | "icon" | "image" | "shape"
+  | "button" | "product-card" | "divider" | "spacer";
+
+export interface CanvasElement {
+  id: string;
+  type: ElementType;
+  name: string;
+  hidden?: boolean;
+  locked?: boolean;
+  frame: ElementFrame;
+  tablet?: ElementBreakpointOverride;
+  mobile?: ElementBreakpointOverride;
+  style: ElementStyle;
+  content: Record<string, any>;
+}
+
 export interface SectionConfig {
   id: string;
   type: string;
@@ -44,6 +87,7 @@ export interface SectionConfig {
   disabled?: boolean;
   settings: Record<string, any>;
   blocks: BlockConfig[];
+  elements?: CanvasElement[];
 }
 
 export interface TemplateConfig {
@@ -70,6 +114,7 @@ export interface SectionSchema {
   limit?: number;
 }
 
+// THIS IS THE FIX: Added "font", "animation", and "icon" to the union
 export type SettingField =
   | { key: string; type: "text"; label: string; default?: string }
   | { key: string; type: "textarea"; label: string; default?: string }
@@ -81,4 +126,7 @@ export type SettingField =
   | { key: string; type: "image"; label: string; default?: string }
   | { key: string; type: "url"; label: string; default?: string }
   | { key: string; type: "boolean"; label: string; default?: boolean }
-  | { key: string; type: "alignment"; label: string; default?: "left" | "center" | "right" };
+  | { key: string; type: "alignment"; label: string; default?: "left" | "center" | "right" }
+  | { key: string; type: "font"; label: string; default?: string }
+  | { key: string; type: "animation"; label: string; default?: string }
+  | { key: string; type: "icon"; label: string; default?: string };

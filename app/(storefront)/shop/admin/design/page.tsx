@@ -1,3 +1,5 @@
+// app/(storefront)/shop/admin/design/page.tsx
+
 import { prisma } from "@/app/lib/prisma";
 import DesignEditor from "./DesignEditor";
 import type { StorefrontSettingsV2 } from "./types";
@@ -8,10 +10,13 @@ export const dynamic = "force-dynamic";
 export default async function DesignPage() {
   const company = await prisma.company.findFirst({
     orderBy: { createdAt: "asc" },
-    include: { companySettings: { select: { storefront: true } } },
+    // UPDATE THIS LINE: Include both storefront and storefrontDraft
+    include: { companySettings: { select: { storefront: true, storefrontDraft: true } } }, 
   });
 
-  const raw = (company?.companySettings?.storefront as any) || {};
+  // Load the draft first, fallback to live, then fallback to empty object
+  const raw = (company?.companySettings?.storefrontDraft || company?.companySettings?.storefront as any) || {};
+  
   const storefront: StorefrontSettingsV2 = {
     theme: raw.theme ?? DEFAULT_THEME,
     templates: raw.templates ?? {

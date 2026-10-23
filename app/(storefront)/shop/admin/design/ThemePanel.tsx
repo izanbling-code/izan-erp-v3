@@ -1,15 +1,7 @@
 "use client";
 
 import type { ThemeConfig } from "./types";
-
-const FONTS = [
-  "Inter, sans-serif",
-  "Georgia, serif",
-  "'Playfair Display', serif",
-  "'DM Sans', sans-serif",
-  "'Space Grotesk', sans-serif",
-  "system-ui, sans-serif",
-];
+import { FONT_LIBRARY } from "./registry";
 
 export default function ThemePanel({
   theme,
@@ -51,13 +43,13 @@ export default function ThemePanel({
         <Select
           label="Heading font"
           value={theme.typography.headingFont}
-          options={FONTS}
+          options={FONT_LIBRARY.map((font) => font.value)}
           onChange={(v) => setTypo("headingFont", v)}
         />
         <Select
           label="Body font"
           value={theme.typography.bodyFont}
-          options={FONTS}
+          options={FONT_LIBRARY.map((font) => font.value)}
           onChange={(v) => setTypo("bodyFont", v)}
         />
         <Input

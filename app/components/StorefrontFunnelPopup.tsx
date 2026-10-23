@@ -40,10 +40,9 @@ export default function StorefrontFunnelPopup({
 
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = "auto"; // <--- FORCE UNLOCK SCROLL
     };
   }, [open]);
 

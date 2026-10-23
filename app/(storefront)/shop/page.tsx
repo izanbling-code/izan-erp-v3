@@ -3,6 +3,7 @@ import StorefrontTemplate from "@/app/components/StorefrontTemplate";
 import StorefrontSectionRenderer from "@/app/components/StorefrontSectionRenderer";
 import StorefrontFunnelPopup from "@/app/components/StorefrontFunnelPopup";
 import type { CSSProperties } from "react";
+import CanvasStaticLayer from "@/app/(storefront)/shop/admin/design/canvas/CanvasStaticLayer";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,14 @@ type StorefrontSettings = {
   pages?: Record<string, { rawHtml?: string; rawCss?: string }>;
 };
 
-export default async function ShopPage() {
+export default async function ShopPage({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ preview?: string }> 
+}) {
+  const resolvedParams = await searchParams;
+  const isPreview = resolvedParams?.preview === "true";
+
   const company = await prisma.company.findFirst({
     orderBy: { createdAt: "asc" },
     include: { companySettings: true },
@@ -30,22 +38,21 @@ export default async function ShopPage() {
 
   const activeQuiz = await prisma.storefrontQuiz.findFirst({
     orderBy: { createdAt: "desc" },
-    include: {
-      nodes: {
-        include: {
-          choices: true,
-        },
-      },
-    },
+    include: { nodes: { include: { choices: true } } },
   });
 
-  const settings = company?.companySettings?.storefront as StorefrontSettings | null;
+  const settings = (isPreview 
+    ? company?.companySettings?.storefrontDraft 
+    : company?.companySettings?.storefront) as StorefrontSettings | null;
+
   const homePage = settings?.pages?.home;
   const allSections = settings?.templates?.index?.sections ?? [];
   const v2Theme = settings?.theme;
   const hasV2 = allSections.length > 0;
 
-  // Pull the welcome-funnel section out — it renders as a popup, not inline.
+  const salesSettings = company?.companySettings?.sales as any;
+  const dynamicStoreName = salesSettings?.storeName || "IZAN BLING";
+
   const funnelSection = allSections.find(
     (s: any) => s.type === "welcome-funnel" && !s.disabled
   );
@@ -61,7 +68,6 @@ export default async function ShopPage() {
     compareAtPrice: p.compareAtPrice !== null ? Number(p.compareAtPrice) : null,
   }));
 
-  // Serialize the quiz so Prisma Decimals survive the server→client boundary.
   const plainQuiz = activeQuiz
     ? {
         id: activeQuiz.id,
@@ -99,28 +105,46 @@ export default async function ShopPage() {
     : {}) as CSSProperties;
 
   return (
-    <main className="w-full flex flex-col relative">
+    <main className="w-full min-h-screen bg-slate-100 flex justify-center" style={themeVars}>
+      {isPreview && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-teal-500 text-white px-6 py-2 rounded-full font-bold shadow-lg text-sm">
+          Preview Mode (Draft)
+        </div>
+      )}
+
       {funnelSection && (
         <StorefrontFunnelPopup section={funnelSection} quizData={plainQuiz} />
       )}
 
+      {/* 
+        FIXED: We added max-w-[1200px] mx-auto here. 
+        This forces the live site to match the width of your editor!
+      */}
       {hasV2 && (
-        <div
-          style={themeVars}
-          className="w-full relative z-10 bg-[var(--theme-bg,#ffffff)] text-[var(--theme-text,#0f172a)]"
-        >
+        <div className="w-full max-w-[1200px] bg-[var(--theme-bg,#ffffff)] shadow-2xl relative min-h-screen overflow-x-hidden">
           {inlineSections.map((section: any) => (
-            <StorefrontSectionRenderer
-              key={section.id}
-              section={section}
-              products={plainProducts}
-            />
+            <div 
+              key={section.id} 
+              style={{ position: "relative" }}
+              // FIXED: Ensures navbar background is solid white
+              className={section.type === "navbar" ? "bg-white z-20 relative" : ""}
+            >
+              <StorefrontSectionRenderer
+                section={section}
+                products={plainProducts}
+                storeName={dynamicStoreName}
+              />
+              <CanvasStaticLayer
+                elements={section.elements ?? []}
+                products={plainProducts}
+              />
+            </div>
           ))}
         </div>
       )}
 
       {!hasV2 && homePage?.rawHtml?.trim() && (
-        <div className="w-full relative z-10 bg-white">
+        <div className="w-full max-w-[1200px] relative z-10 bg-white">
           <StorefrontTemplate
             html={homePage.rawHtml}
             css={homePage.rawCss}

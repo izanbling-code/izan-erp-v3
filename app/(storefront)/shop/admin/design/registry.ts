@@ -1,6 +1,7 @@
 import type { SectionSchema, BlockConfig } from "./types";
+import type { CanvasElement, ElementType, ElementFrame, ElementStyle } from "./types";
 
-const uid = () => Math.random().toString(36).slice(2, 10);
+export const uid = () => Math.random().toString(36).slice(2, 10);
 
 export const SECTION_REGISTRY: Record<string, SectionSchema> = {
   "announcement-bar": {
@@ -26,6 +27,37 @@ export const SECTION_REGISTRY: Record<string, SectionSchema> = {
     ],
   },
 
+  navbar: {
+    type: "navbar",
+    label: "Navigation Bar",
+    icon: "Menu",
+    category: "header",
+    allowsBlocks: true,
+    blockSchema: [
+      { key: "label", type: "text", label: "Link Label (Optional)", default: "" },
+      { key: "href", type: "url", label: "Link URL", default: "/shop" },
+      { key: "icon", type: "icon", label: "Icon (Optional)", default: "" },
+    ],
+    defaultBlocks: [
+      { id: uid(), type: "nav-item", settings: { label: "Shop", href: "/shop", icon: "" } },
+      { id: uid(), type: "nav-item", settings: { label: "Our Story", href: "/shop", icon: "" } },
+      { id: uid(), type: "nav-item", settings: { label: "", href: "/shop/account", icon: "User" } },
+      { id: uid(), type: "nav-item", settings: { label: "", href: "/shop/cart", icon: "ShoppingCart" } },
+    ] as BlockConfig[],
+    defaultSettings: {
+      brandName: "IZAN BLING",
+      bgColor: "#ffffff",
+      textColor: "#0f172a",
+      paddingY: 24,
+    },
+    settingsSchema: [
+      { key: "brandName", type: "text", label: "Brand Name", default: "IZAN BLING" },
+      { key: "bgColor", type: "color", label: "Background", default: "#ffffff" },
+      { key: "textColor", type: "color", label: "Text color", default: "#0f172a" },
+      { key: "paddingY", type: "range", label: "Vertical padding", min: 8, max: 64, default: 24 },
+    ],
+  },
+
   "hero-banner": {
     type: "hero-banner",
     label: "Hero Banner",
@@ -36,25 +68,33 @@ export const SECTION_REGISTRY: Record<string, SectionSchema> = {
       subheading: "Discover our curated collection of timeless pieces.",
       buttonLabel: "Shop Now",
       buttonUrl: "/shop",
+      backgroundType: "image",
+      backgroundColor: "#0f172a",
       imageUrl: "",
       overlayOpacity: 0.45,
       textColor: "#ffffff",
       alignment: "center",
       minHeight: 520,
       headingSize: 56,
+      headingFont: "",
+      headingColor: "#ffffff",
       paddingY: 80,
     },
     settingsSchema: [
-      { key: "heading", type: "text", label: "Heading", default: "" },
-      { key: "subheading", type: "textarea", label: "Subheading", default: "" },
-      { key: "imageUrl", type: "image", label: "Background image", default: "" },
+      { key: "heading", type: "text", label: "Heading Text", default: "Elevate Your Aesthetic" },
+      { key: "subheading", type: "textarea", label: "Subheading Text", default: "" },
       { key: "buttonLabel", type: "text", label: "Button label", default: "" },
       { key: "buttonUrl", type: "url", label: "Button URL", default: "" },
       { key: "alignment", type: "alignment", label: "Text alignment", default: "center" },
-      { key: "textColor", type: "color", label: "Text color", default: "#ffffff" },
+      { key: "backgroundType", type: "select", label: "Background Type", default: "image", options: [{ label: "Image", value: "image" }, { label: "Solid Color", value: "color" }] },
+      { key: "backgroundColor", type: "color", label: "Background Color", default: "#0f172a" },
+      { key: "imageUrl", type: "image", label: "Background image", default: "" },
       { key: "overlayOpacity", type: "range", label: "Overlay opacity", min: 0, max: 1, step: 0.05, default: 0.45 },
-      { key: "minHeight", type: "range", label: "Min height (px)", min: 320, max: 800, default: 520 },
+      { key: "headingFont", type: "font", label: "Heading Font", default: "" },
       { key: "headingSize", type: "range", label: "Heading size (px)", min: 24, max: 100, default: 56 },
+      { key: "headingColor", type: "color", label: "Heading Color", default: "#ffffff" },
+      { key: "textColor", type: "color", label: "Subheading Color", default: "#ffffff" },
+      { key: "minHeight", type: "range", label: "Min height (px)", min: 320, max: 800, default: 520 },
       { key: "paddingY", type: "range", label: "Vertical padding (px)", min: 0, max: 200, default: 80 },
     ],
   },
@@ -79,16 +119,7 @@ export const SECTION_REGISTRY: Record<string, SectionSchema> = {
       { key: "heading", type: "text", label: "Heading", default: "" },
       { key: "body", type: "textarea", label: "Body", default: "" },
       { key: "imageUrl", type: "image", label: "Image", default: "" },
-      {
-        key: "layout",
-        type: "select",
-        label: "Layout",
-        default: "image-left",
-        options: [
-          { label: "Image left", value: "image-left" },
-          { label: "Image right", value: "image-right" },
-        ],
-      },
+      { key: "layout", type: "select", label: "Layout", default: "image-left", options: [{ label: "Image left", value: "image-left" }, { label: "Image right", value: "image-right" }] },
       { key: "buttonLabel", type: "text", label: "Button label", default: "" },
       { key: "buttonUrl", type: "url", label: "Button URL", default: "" },
       { key: "bgColor", type: "color", label: "Background", default: "#ffffff" },
@@ -112,6 +143,9 @@ export const SECTION_REGISTRY: Record<string, SectionSchema> = {
       paddingY: 80,
       showPrice: true,
       showSaleBadge: true,
+      hoverAnimation: "hover-zoom",
+      cardRadius: 12,
+      cardShadow: true,
     },
     settingsSchema: [
       { key: "heading", type: "text", label: "Heading", default: "" },
@@ -120,6 +154,9 @@ export const SECTION_REGISTRY: Record<string, SectionSchema> = {
       { key: "columns", type: "range", label: "Columns (desktop)", min: 2, max: 5, default: 4 },
       { key: "showPrice", type: "boolean", label: "Show price", default: true },
       { key: "showSaleBadge", type: "boolean", label: "Show sale badge", default: true },
+      { key: "hoverAnimation", type: "animation", label: "Hover Animation", default: "hover-zoom" },
+      { key: "cardRadius", type: "range", label: "Card Border Radius", min: 0, max: 40, default: 12 },
+      { key: "cardShadow", type: "boolean", label: "Show Card Shadow", default: true },
       { key: "bgColor", type: "color", label: "Background", default: "#ffffff" },
       { key: "textColor", type: "color", label: "Text color", default: "#0f172a" },
       { key: "paddingY", type: "range", label: "Vertical padding (px)", min: 0, max: 200, default: 80 },
@@ -263,8 +300,7 @@ export const SECTION_REGISTRY: Record<string, SectionSchema> = {
     category: "content",
     defaultSettings: {
       heading: "Define Your Aesthetic",
-      subheading:
-        "Skip the endless scrolling. Tell us about your style, and we will curate the perfect pieces exclusively for you.",
+      subheading: "Skip the endless scrolling. Tell us about your style, and we will curate the perfect pieces exclusively for you.",
       buttonLabel: "Begin the Experience",
       backgroundImageUrl: "",
       backgroundColor: "#0a0a0a",
@@ -313,6 +349,7 @@ export const DEFAULT_THEME = {
 export const DEFAULT_HOME_TEMPLATE = {
   sections: [
     { id: uid(), type: "announcement-bar", name: "Announcement Bar", settings: { ...SECTION_REGISTRY["announcement-bar"].defaultSettings }, blocks: [] },
+    { id: uid(), type: "navbar", name: "Navbar", settings: { ...SECTION_REGISTRY["navbar"].defaultSettings }, blocks: SECTION_REGISTRY["navbar"].defaultBlocks || [] },
     { id: uid(), type: "hero-banner", name: "Hero Banner", settings: { ...SECTION_REGISTRY["hero-banner"].defaultSettings }, blocks: [] },
     { id: uid(), type: "featured-collection", name: "Featured Collection", settings: { ...SECTION_REGISTRY["featured-collection"].defaultSettings }, blocks: [] },
     { id: uid(), type: "multicolumn", name: "Multicolumn", settings: { ...SECTION_REGISTRY["multicolumn"].defaultSettings }, blocks: SECTION_REGISTRY["multicolumn"].defaultBlocks || [] },
@@ -333,4 +370,90 @@ export function createSection(type: string) {
   };
 }
 
-export { uid };
+export const FONT_LIBRARY = [
+  { family: "Inter",              value: "Inter, sans-serif" },
+  { family: "Poppins",            value: "Poppins, sans-serif" },
+  { family: "DM Sans",            value: "'DM Sans', sans-serif" },
+  { family: "Manrope",            value: "Manrope, sans-serif" },
+  { family: "Montserrat",         value: "Montserrat, sans-serif" },
+  { family: "Space Grotesk",      value: "'Space Grotesk', sans-serif" },
+  { family: "Bebas Neue",         value: "'Bebas Neue', sans-serif" },
+  { family: "Playfair Display",   value: "'Playfair Display', serif" },
+  { family: "Cormorant Garamond", value: "'Cormorant Garamond', serif" },
+  { family: "Lora",               value: "Lora, serif" },
+];
+
+interface ElementDef {
+  label: string;
+  icon: string;
+  defaultFrame: Omit<ElementFrame, "zIndex">;
+  defaultStyle: ElementStyle;
+  defaultContent: Record<string, any>;
+}
+
+export const ELEMENT_REGISTRY: Record<ElementType, ElementDef> = {
+  text: {
+    label: "Text", icon: "Type",
+    defaultFrame: { x: 40, y: 40, width: 320, height: 80, rotation: 0 },
+    defaultStyle: { fontSize: 24, fontWeight: 600, color: "#0f172a", textAlign: "left", lineHeight: 1.2 },
+    defaultContent: { text: "Your text here" },
+  },
+  icon: {
+    label: "Icon", icon: "Star",
+    defaultFrame: { x: 40, y: 40, width: 64, height: 64, rotation: 0 },
+    defaultStyle: { color: "#0f172a" },
+    defaultContent: { iconName: "Sparkles", strokeWidth: 2 },
+  },
+  image: {
+    label: "Image", icon: "Image",
+    defaultFrame: { x: 40, y: 40, width: 240, height: 240, rotation: 0 },
+    defaultStyle: { borderRadius: 12 },
+    defaultContent: { url: "", alt: "", objectFit: "cover" },
+  },
+  shape: {
+    label: "Shape", icon: "Square",
+    defaultFrame: { x: 40, y: 40, width: 120, height: 120, rotation: 0 },
+    defaultStyle: { background: "#14b8a6", borderRadius: 8 },
+    defaultContent: { shape: "rectangle" },
+  },
+  button: {
+    label: "Button", icon: "MousePointerClick",
+    defaultFrame: { x: 40, y: 40, width: 160, height: 48, rotation: 0 },
+    defaultStyle: { background: "#14b8a6", color: "#ffffff", fontSize: 14, fontWeight: 600, borderRadius: 8 },
+    defaultContent: { label: "Shop now", href: "/shop", target: "_self" },
+  },
+  "product-card": {
+    label: "Product Card", icon: "ShoppingBag",
+    defaultFrame: { x: 40, y: 40, width: 220, height: 320, rotation: 0 },
+    defaultStyle: { borderRadius: 12, fontSize: 14 },
+    defaultContent: { productId: "" },
+  },
+  divider: {
+    label: "Divider", icon: "Minus",
+    defaultFrame: { x: 40, y: 40, width: 300, height: 2, rotation: 0 },
+    defaultStyle: { background: "#e2e8f0" },
+    defaultContent: {},
+  },
+  spacer: {
+    label: "Spacer", icon: "Square",
+    defaultFrame: { x: 40, y: 40, width: 200, height: 100, rotation: 0 },
+    defaultStyle: {},
+    defaultContent: {},
+  },
+};
+
+export function createElement(
+  type: ElementType,
+  opts: Partial<CanvasElement> = {}
+): CanvasElement {
+  const def = ELEMENT_REGISTRY[type];
+  return {
+    id: Math.random().toString(36).slice(2, 10),
+    type,
+    name: def.label,
+    ...opts,
+    frame: { ...def.defaultFrame, zIndex: 1, ...(opts.frame ?? {}) },
+    style: { ...def.defaultStyle, ...(opts.style ?? {}) },
+    content: { ...def.defaultContent, ...(opts.content ?? {}) },
+  };
+}
